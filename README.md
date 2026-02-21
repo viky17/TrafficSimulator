@@ -1,22 +1,26 @@
 # Urban Traffic Simulator
+# Urban Traffic Simulator
 
-A Python-based simulation engine developed to model large-scale urban mobility. This project focuses on the interaction between different transport modes—pedestrians, cars, and heavy vehicles—within real-world road networks.
+A high-performance Python simulation engine designed to model and analyze large-scale urban mobility. This project transforms raw geospatial data into a living, interactive metropolis, allowing users to explore the complex dynamics of city traffic in real-time.
+## 1. Introduction:
+This project is more than just a routing script; it is a **geospatial experiment** designed to handle massive concurrent data processing. The core philosophy was to move beyond "toy models" and build a tool capable of simulating real-world city districts with extreme fidelity.
 
-## 1. Introduction
-This project started as an investigation into how Python handles massive, concurrent data processing within a spatial context. The goal was to build a simulator that wasn't just a toy model, but a tool capable of running on real-world city maps. 
+By integrating OpenStreetMap data, the simulator allows you to:
+* **Simulate Any Location:** Download and populate any street network worldwide, from a small neighborhood to a sprawling metropolis.
+* **Be the Urban Planner:** Interactively block roads or create bottlenecks to observe how traffic flow redistributes across the city graph.
+* **Analyze Multi-Modal Stress:** Observe how different entities—from pedestrians to heavy trucks—compete for road capacity and impact urban congestion.
 
-By integrating OpenStreetMap data, the engine simulates how thousands of agents navigate through complex street layouts. The project evolved from a simple routing script into a highly optimized engine, shifting the focus from "how to move an agent" to "how to manage 25,000 agents efficiently." It serves as a practical exploration of graph theory, multiprocessing, and system resource management.
+What started as an investigation into Python's performance evolved into a highly optimized engine, shifting the focus from simple agent movement to the efficient management of **75,000+ agents** in a 3D environment.
 
 ## 2. Key Features
-The simulator is built around several core functionalities that allow for a realistic representation of urban traffic:
+The simulator provides a robust set of tools for both interactive exploration and technical analysis:
 
-* **Real-World Infrastructure:** Utilizes `OSMnx` and `NetworkX` to download and model actual street networks. It supports different network types (drive and walk) to ensure agents move on appropriate paths.
-* **Multi-Agent Ecosystem:** Manages three distinct classes of agents—Pedestrians, Standard Vehicles, and Heavy Vehicles—each with specific speed variables and "road footprint" (impact on congestion).
-* **Dynamic Traffic Constraints:**
-    * **Traffic Lights:** Tick-based intersection logic that alternates flow based on the simulation clock.
-    * **Road Capacity:** Edges have limited volume; when capacity is reached, agents experience delays or "stalling," simulating real-world traffic jams.
-* **Interactive Barrier Management:** A real-time system to "block" specific nodes or edges. The engine recalculates weights, forcing agents to find alternative routes or remain stuck, simulating roadwork or accidents.
-* **3D Geospatial Visualization:** Real-time rendering via `Pydeck` and `Streamlit`, allowing for a 3D view of agents moving through the city with color-coded status indicators (moving vs. congested).
+* **Infinite World Maps:** Direct integration with `OSMnx` and `NetworkX` to model actual street layouts, supporting distinct pathfinding for driving and walking networks.
+* **Interactive Environment Management:** * **Live Road Blocks:** Real-time system to "block" nodes or edges. The engine immediately forces agents to find alternative routes, simulating accidents or roadwork.
+    * **Adaptive Traffic Lights:** Tick-based logic that alternates flow at intersections based on the global simulation clock.
+* **Massive Multi-Agent Ecosystem:** Manages three distinct classes (Pedestrians, Cars, Heavy Vehicles) with individual speeds and "road footprints" that dynamically influence congestion.
+* **Resource-Aware Congestion:** Edges have limited volume; when capacity is reached, agents experience realistic delays or "stalling."
+* **GPU-Accelerated 3D Visualization:** Real-time rendering via `Pydeck` and `Streamlit`, providing a bird's-eye 3D view with color-coded status indicators for movement and gridlock.
 
 ## 3. The Engineering Challenge
 
