@@ -18,11 +18,11 @@ The simulator is built around several core functionalities that allow for a real
 * **Interactive Barrier Management:** A real-time system to "block" specific nodes or edges. The engine recalculates weights, forcing agents to find alternative routes or remain stuck, simulating roadwork or accidents.
 * **3D Geospatial Visualization:** Real-time rendering via `Pydeck` and `Streamlit`, allowing for a 3D view of agents moving through the city with color-coded status indicators (moving vs. congested).
 
-## 3. The Engineering Challenge: Overcoming the Parallelism Paradox
+## 3. The Engineering Challenge
 
 The primary challenge of this project was scaling the simulation to 10,000+ agents. In Python, moving from a single-threaded script to a high-performance engine revealed significant architectural bottlenecks that required a deep dive into system resource management.
 
-### Identifying the Bottleneck: The "Pickling" Overhead
+### Identifying the Bottleneck
 Initial attempts to use standard multiprocessing led to a "Parallelism Paradox": adding more CPU cores actually made the simulation slower (jumping from 4 minutes to 25 minutes for 25,000 agents). 
 
 
@@ -40,7 +40,7 @@ To resolve this, I re-engineered the engine’s data flow using three core strat
 
 To evaluate the efficiency of the engine, I conducted extensive stress tests comparing the initial sequential logic against the final optimized parallel architecture. The data shows that the final version doesn't just run faster; it scales more efficiently as the population grows.
 
-### Sequential vs. Parallel (The Turning Point)
+### Sequential vs. Parallel
 The most significant improvement was seen in the "Massive Population" scenario (25,000 agents). The unoptimized multiprocessing attempt suffered from heavy serialization overhead, while the final **Shared Memory** approach achieved a breakthrough in throughput.
 
 | Version | Population | Execution Time | Throughput | Peak RAM |
@@ -49,7 +49,7 @@ The most significant improvement was seen in the "Massive Population" scenario (
 | **Multiprocessing (Unoptimized)** | 25,000 | ~1512s | <100 rows/s | High (Churn) |
 | **Final (Shared Memory)** | 25,000 | **79.6s** | **12,131 rows/s** | **371 MB** |
 
-### Scalability Performance (Final Engine)
+### Scalability Performance
 The final engine demonstrates a non-linear performance gain: as the agent count increases, the system becomes more efficient at utilizing CPU cycles.
 
 | Scenario | Agents | Duration (Ticks) | Elapsed Time (s) | Throughput (Rows/s) |
