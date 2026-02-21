@@ -35,3 +35,51 @@ To resolve this, I re-engineered the engine’s data flow using three core strat
 1. **Shared Memory via Global Initializers:** I implemented a "Shared Memory" approach. Instead of passing the graph as an argument, I used a global initializer that loads the map into each CPU core's memory only once at startup. This reduced the task payload from a heavy graph object to a lightweight tuple of coordinates.
 2. **Memory-Optimized Agent Architecture:** I decoupled the `Agent` objects from the `NetworkX` graph. By pre-calculating and storing only the necessary coordinate paths, I achieved a stable RAM footprint of **~370MB for 25,000 agents**, preventing memory swapping and crashes.
 3. **Temporal Congestion Sampling:** I optimized the simulation loop by sampling road occupancy every 5 ticks instead of every tick. This "Temporal Sampling" provided a massive CPU relief without affecting the macroscopic accuracy of the traffic flow.
+
+## 4. Benchmark Analysis: Optimization Impact
+
+To evaluate the efficiency of the engine, I conducted extensive stress tests comparing the initial sequential logic against the final optimized parallel architecture. The data shows that the final version doesn't just run faster; it scales more efficiently as the population grows.
+
+### Sequential vs. Parallel (The Turning Point)
+The most significant improvement was seen in the "Massive Population" scenario (25,000 agents). The unoptimized multiprocessing attempt suffered from heavy serialization overhead, while the final **Shared Memory** approach achieved a breakthrough in throughput.
+
+| Version | Population | Execution Time | Throughput | Peak RAM |
+| :--- | :--- | :--- | :--- | :--- |
+| **Initial (Sequential)** | 25,000 | ~238s | ~600 rows/s | >2.0 GB |
+| **Multiprocessing (Unoptimized)** | 25,000 | ~1512s | <100 rows/s | High (Churn) |
+| **Final (Shared Memory)** | 25,000 | **79.6s** | **12,131 rows/s** | **371 MB** |
+
+### Scalability Performance (Final Engine)
+The final engine demonstrates a non-linear performance gain: as the agent count increases, the system becomes more efficient at utilizing CPU cycles.
+
+| Scenario | Agents | Duration (Ticks) | Elapsed Time (s) | Throughput (Rows/s) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Baseline** | 100 | 100 | 9.25s | 567 |
+| **Urban Load** | 5,000 | 200 | 38.66s | 5,471 |
+| **Heavy Stress** | 15,000 | 200 | 63.22s | 9,399 |
+| **Massive Pop.** | 25,000 | 300 | 79.65s | **12,131** |
+
+
+
+## 5. Installation & Setup
+
+This project is built with Python 3.9+. To replicate the simulation or the benchmarks locally, follow these steps:
+
+### 1. Prerequisites
+Ensure you have `pip` and a virtual environment manager installed. The simulation requires several spatial and data science libraries:
+* **OSMnx / NetworkX:** For street network modeling.
+* **Streamlit / Pydeck:** For the interactive dashboard and 3D rendering.
+* **Pandas / NumPy:** For high-speed data manipulation.
+
+### 2. Local Installation
+```bash
+# Clone the repository
+git clone [https://github.com/your-username/Traffic-Simulator.git](https://github.com/your-username/Traffic-Simulator.git)
+cd Traffic-Simulator
+
+# Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
