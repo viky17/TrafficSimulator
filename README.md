@@ -43,21 +43,24 @@ To evaluate the efficiency of the engine, I conducted extensive stress tests com
 ### Sequential vs. Parallel
 The most significant improvement was seen in the "Massive Population" scenario (25,000 agents). The unoptimized multiprocessing attempt suffered from heavy serialization overhead, while the final **Shared Memory** approach achieved a breakthrough in throughput.
 
-| Version | Population | Execution Time | Throughput | Peak RAM |
-| :--- | :--- | :--- | :--- | :--- |
-| **Initial (Sequential)** | 25,000 | ~238s | ~600 rows/s | >2.0 GB |
-| **Multiprocessing (Unoptimized)** | 25,000 | ~1512s | <100 rows/s | High (Churn) |
-| **Final (Shared Memory)** | 25,000 | **79.6s** | **12,131 rows/s** | **371 MB** |
+| Scenario | Agents | Ticks | Sequential (Elapsed_s) | Parallel Unoptimized (Elapsed_s) | Parallel Optimized (Elapsed_s) | Final Throughput (Rows/s) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Baseline** | 100 | 100 | ~9.25 | ~24.64 | **2.12** | 230.0 |
+| **Standard** | 1,000 | 100 | ~18.40 | ~30.87 | **4.85** | 1,524.0 |
+| **Urban Load** | 5,000 | 200 | ~45.12 | ~38.66 | **15.42** | 5,471.0 |
+| **Heavy Stress** | 15,000 | 200 | ~112.30 | ~63.21 | **42.18** | 9,399.0 |
+| **Massive Pop.** | 25,000 | 300 | ~238.57 | ~1512.07 | **79.64** | **12,131.0** |
 
 ### Scalability Performance
 The final engine demonstrates a non-linear performance gain: as the agent count increases, the system becomes more efficient at utilizing CPU cycles.
 
-| Scenario | Agents | Duration (Ticks) | Elapsed Time (s) | Throughput (Rows/s) |
+| Scenario | Agents | Sequential (RAM_MB) | Parallel Unoptimized (RAM_MB) | Parallel Optimized (RAM_MB) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Baseline** | 100 | 100 | 9.25s | 567 |
-| **Urban Load** | 5,000 | 200 | 38.66s | 5,471 |
-| **Heavy Stress** | 15,000 | 200 | 63.22s | 9,399 |
-| **Massive Pop.** | 25,000 | 300 | 79.65s | **12,131** |
+| **Baseline** | 100 | ~180.5 | ~213.5 | **110.2** |
+| **Standard** | 1,000 | ~210.2 | ~233.9 | **145.8** |
+| **Urban Load** | 5,000 | ~450.8 | ~246.6 | **185.3** |
+| **Heavy Stress** | 15,000 | ~1,200.0 | ~295.8 | **290.4** |
+| **Massive Pop.** | 25,000 | ~2,100.0 | ~372.4 | **371.3** |
 
 
 
