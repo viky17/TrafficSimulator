@@ -62,7 +62,7 @@ The final engine demonstrates a non-linear performance gain: as the agent count 
 | **Heavy Stress** | 15000 | 200 | 63.2189 | 594194 | 9399.0 | 49.23 | 295.86 |
 | **Massive Population** | 25000 | 300 | 79.6477 | 966183 | 12131.0 | 75.52 | 371.38 |
 
-## 4.3 Extreme Scale Testing & System Limits
+## 5 Extreme Scale Testing & System Limits
 
 Finding the operational limits of the engine is crucial for understanding its reliability in production-grade scenarios. I pushed the simulator beyond standard urban loads to identify the "breaking point" of the current architecture on consumer-grade hardware.
 
