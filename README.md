@@ -43,25 +43,24 @@ To evaluate the efficiency of the engine, I conducted extensive stress tests com
 ### Sequential vs. Parallel
 The most significant improvement was seen in the "Massive Population" scenario (25,000 agents). The unoptimized multiprocessing attempt suffered from heavy serialization overhead, while the final **Shared Memory** approach achieved a breakthrough in throughput.
 
-| Scenario | Agents | Ticks | Sequential (Elapsed_s) | Parallel Unoptimized (Elapsed_s) | Parallel Optimized (Elapsed_s) | Final Throughput (Rows/s) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Baseline** | 100 | 100 | ~9.25 | ~24.64 | **2.12** | 230.0 |
-| **Standard** | 1,000 | 100 | ~18.40 | ~30.87 | **4.85** | 1,524.0 |
-| **Urban Load** | 5,000 | 200 | ~45.12 | ~38.66 | **15.42** | 5,471.0 |
-| **Heavy Stress** | 15,000 | 200 | ~112.30 | ~63.21 | **42.18** | 9,399.0 |
-| **Massive Pop.** | 25,000 | 300 | ~238.57 | ~1512.07 | **79.64** | **12,131.0** |
+| Scenario | Agents | Ticks | Elapsed_s | Rows_Generated | Throughput_Rows_s | RAM_Usage_MB | Peak_RAM_MB |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Baseline** | 100 | 100 | 9.2538 | 5247 | 567.0 | 76.83 | 214.32 |
+| **Standard** | 1000 | 100 | 62.7821 | 47718 | 760.0 | 20.31 | 234.62 |
+| **Urban Load** | 5000 | 200 | 307.4083 | 224953 | 732.0 | 9.30 | 243.93 |
+| **Heavy Stress** | 15000 | 200 | 904.9189 | 613564 | 678.0 | 52.62 | 296.55 |
+| **Massive Population** | 25000 | 300 | 1512.0735 | 993201 | 657.0 | 75.85 | 372.40 |
 
 ### Scalability Performance
 The final engine demonstrates a non-linear performance gain: as the agent count increases, the system becomes more efficient at utilizing CPU cycles.
 
-| Scenario | Agents | Sequential (RAM_MB) | Parallel Unoptimized (RAM_MB) | Parallel Optimized (RAM_MB) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Baseline** | 100 | ~180.5 | ~213.5 | **110.2** |
-| **Standard** | 1,000 | ~210.2 | ~233.9 | **145.8** |
-| **Urban Load** | 5,000 | ~450.8 | ~246.6 | **185.3** |
-| **Heavy Stress** | 15,000 | ~1,200.0 | ~295.8 | **290.4** |
-| **Massive Pop.** | 25,000 | ~2,100.0 | ~372.4 | **371.3** |
-
+| Scenario | Agents | Ticks | Elapsed_s | Rows_Generated | Throughput_Rows_s | RAM_Usage_MB | Peak_RAM_MB |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Baseline** | 100 | 100 | 24.6426 | 5659 | 230.0 | 75.92 | 213.54 |
+| **Standard** | 1000 | 100 | 30.8727 | 47051 | 1524.0 | 20.36 | 233.91 |
+| **Urban Load** | 5000 | 200 | 38.6644 | 211514 | 5471.0 | 12.73 | 246.63 |
+| **Heavy Stress** | 15000 | 200 | 63.2189 | 594194 | 9399.0 | 49.23 | 295.86 |
+| **Massive Population** | 25000 | 300 | 79.6477 | 966183 | 12131.0 | 75.52 | 371.38 |
 
 
 ## 5. Installation & Setup
