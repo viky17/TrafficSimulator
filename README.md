@@ -62,8 +62,31 @@ The final engine demonstrates a non-linear performance gain: as the agent count 
 | **Heavy Stress** | 15000 | 200 | 63.2189 | 594194 | 9399.0 | 49.23 | 295.86 |
 | **Massive Population** | 25000 | 300 | 79.6477 | 966183 | 12131.0 | 75.52 | 371.38 |
 
+## 4.3 Extreme Scale Testing & System Limits
 
-## 5. Installation & Setup
+Finding the operational limits of the engine is crucial for understanding its reliability in production-grade scenarios. I pushed the simulator beyond standard urban loads to identify the "breaking point" of the current architecture on consumer-grade hardware.
+
+### Results: From Metropolis to the Breaking Point
+As the agent count and search radius increased, the engine continued to process millions of data points until reaching the physical limits of the system.
+
+| Scenario | Agents | Radius | Ticks | Elapsed_s | Rows_Generated | Throughput (Rows/s) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **District Scale** | 30,000 | 1500m | 100 | 258.81s | 1,445,833 | 5,586 |
+| **City Scale** | 50,000 | 2000m | 100 | 539.71s | 2,796,979 | 5,182 |
+| **Metropolis Scale** | 75,000 | 3000m | 150 | 1317.36s | 5,663,755 | 4,299 |
+| **Maximum Stress** | 100,000 | 5000m | 200 | **SYSTEM CRASH** | -- | -- |
+
+### Failure Analysis: The 100k Threshold
+At the **100,000 agents** threshold with a 5km search radius, the simulation encountered a system failure.
+
+**Technical Diagnosis:**
+* **Memory Saturation:** The combination of a massive spatial graph (5km radius) and the pre-calculation of paths for 100,000 agents exceeded the available physical RAM. 
+* **OOM (Out Of Memory) Event:** The silence from the terminal and subsequent crash indicate an OS-level intervention (OOM Killer) during the "Pathfinding Initialization" phase.
+* **Geospatial Complexity:** Doubling the radius from 2.5km to 5km quadruples the search area ($A = \pi r^2$), leading to an exponential increase in graph nodes and memory overhead.
+
+**Conclusion:** The current architecture is optimized for high-performance stability up to **~75,000 concurrent agents**. To scale beyond this limit, the next engineering step would involve implementing **Dynamic Path Loading** or **Spatial Chunking** to reduce the initial memory footprint.
+
+## 6. Installation & Setup
 
 This project is built with Python 3.9+. To replicate the simulation or the benchmarks locally, follow these steps:
 
