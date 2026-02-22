@@ -147,15 +147,9 @@ def getCriticalNodes(df):
     
     stays = v_df.groupby(['lat', 'lon']).size().reset_index(name='Dwell Intensity')
     top_nodes = stays.sort_values(by='Dwell Intensity', ascending=False).head(5)
-
-    street_names = []
-    if not street_names:
-        street_names = [f"Area near {lat:.4f}, {lon:.4f}" for lat, lon in zip(top_nodes['lat'], top_nodes['lon'])]
-    
-    top_nodes['Street Name'] = street_names
     
     st.dataframe(
-        top_nodes[['Street Name', 'lat', 'lon', 'Dwell Intensity']], 
+        top_nodes[['lat', 'lon', 'Dwell Intensity']], 
         use_container_width=True, 
         hide_index=True
     )
