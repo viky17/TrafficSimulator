@@ -19,7 +19,7 @@ What started as an investigation into Python's performance evolved into a highly
 The simulator provides a robust set of tools for both interactive exploration and technical analysis:
 
 * **Infinite World Maps:** Direct integration with `OSMnx` and `NetworkX` to model actual street layouts, supporting distinct pathfinding for driving and walking networks.
-* **Interactive Environment Management:** * **Live Road Blocks:** Real-time system to "block" nodes or edges. The engine immediately forces agents to find alternative routes, simulating accidents or roadwork.
+* **Interactive Environment Management:**  Real-time system to "block" nodes or edges. The engine immediately forces agents to find alternative routes, simulating accidents or roadwork.
     * **Adaptive Traffic Lights:** Tick-based logic that alternates flow at intersections based on the global simulation clock.
 * **Massive Multi-Agent Ecosystem:** Manages three distinct classes (Pedestrians, Cars, Heavy Vehicles) with individual speeds and "road footprints" that dynamically influence congestion.
 * **Resource-Aware Congestion:** Edges have limited volume; when capacity is reached, agents experience realistic delays or "stalling."
