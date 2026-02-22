@@ -1,7 +1,8 @@
+altair==4.2.2
+streamlit
 osmnx
 networkx
 pandas
 numpy
-streamlit
 pydeck
 scipy
