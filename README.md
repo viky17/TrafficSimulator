@@ -2,7 +2,9 @@
 
 A high-performance Python simulation engine designed to model and analyze large-scale urban mobility. This project transforms raw geospatial data into a living, interactive metropolis, allowing users to explore the complex dynamics of city traffic in real-time.
 ## Video Demo
-https://github.com/viky17/TrafficSimulator/raw/main/assets/demo.mp4
+
+https://github.com/user-attachments/assets/fefb1e51-b01e-46e4-808f-b10e8190cefd
+
 ## 1. Introduction:
 This project is more than just a routing script; it is a **geospatial experiment** designed to handle massive concurrent data processing. The core philosophy was to move beyond "toy models" and build a tool capable of simulating real-world city districts with extreme fidelity.
 
