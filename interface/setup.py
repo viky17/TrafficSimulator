@@ -106,6 +106,7 @@ def show():
                 
     # --- SIMULATION TRIGGER ---
     if add_submitButton:
+        st.session_state['page'] = 'simulation'
         # Inizializzazione city_name se mancante
         if 'city_name' not in st.session_state:
             st.session_state['city_name'] = "Custom Area"
@@ -140,7 +141,6 @@ def show():
             st.session_state['pedestrianNumber'] = add_pedestrianInput
             
             # CAMBIO PAGINA
-            st.session_state['page'] = 'simulation'
             
             # Notifica a video prima del rerun
             st.toast("Switching to Simulation View...")
@@ -148,4 +148,5 @@ def show():
             # RERUN FORZATO
             st.rerun()
         else:
+
             st.error("The simulation returned no data. Try increasing the range or changing location.")
