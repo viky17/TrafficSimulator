@@ -1,210 +1,87 @@
-import multiprocessing
-import os
-
-try:
-    # Controlliamo se siamo su Streamlit Cloud (dove 'spawn' potrebbe non essere permesso)
-    if not os.getenv("STREAMLIT_RUNTIME_ENV_CLOUD"):
-        if multiprocessing.get_start_method(allow_none=True) is None:
-            multiprocessing.set_start_method('spawn', force=True)
-except RuntimeError:
-    pass
-
 import osmnx as ox
 import pandas as pd
 import random
-import time
 import networkx as nx
+import os
 import numpy as np
 from scipy.spatial import KDTree
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
+# Configurazione OSMnx
+ox.settings.timeout = 180
+ox.settings.use_cache = True
 
-# Create cache directory
 if not os.path.exists("cache"):
     os.makedirs("cache")
 
 # --- CLASSES ---
 
 class Agent():
-    """Optimized Agent: Stores path and coordinates, avoiding graph lookups during simulation."""
     def __init__(self, agentId, path, pathCoords, typeStr):
         self.id = agentId
         self.path = path  
-        self.pathCoords = pathCoords # Pre-stored (lat, lon) for each step
+        self.pathCoords = pathCoords 
         self.type = typeStr
         self.active = True if path and len(path) > 1 else False
         self.currentStep = 0
         self.currentNode = path[0] if self.active else None
         self.stuckTicks = 0
         self.ticksAlive = 0
+        self.isHeavy = (typeStr == 'HeavyVehicle')
 
     def step(self):
-        if not self.active:
-            return
-        
-        prevNode = self.currentNode
+        if not self.active: return
         if self.currentStep < len(self.path) - 1:
             self.currentStep += 1
             self.currentNode = self.path[self.currentStep]
-            
-            # Reset stuck counter if the agent moved to a new node
-            if self.currentNode != prevNode:
-                self.stuckTicks = 0
-                
             if self.currentStep == len(self.path) - 1:
                 self.active = False
         else:
             self.active = False
 
-# --- MULTIPROCESSING WORKER ---
-
-workerGraph = None
-
-def InitWorker(graph):
-    """Inizializza il grafo una sola volta per ogni core della CPU."""
-    global workerGraph
-    workerGraph = graph
+# --- WORKER PER PATHFINDING ---
 
 def ComputePathWorker(args):
-    global workerGraph
-    agentId, origin, target, weightType, typeStr = args
-    
-    if workerGraph is None: return None
-
+    graph, agentId, origin, target, weightType, typeStr = args
     try:
-        # Verifichiamo se esiste un percorso prima di calcolarlo
-        if nx.has_path(workerGraph, origin, target):
-            path = ox.shortest_path(workerGraph, origin, target, weight=weightType)
+        if nx.has_path(graph, origin, target):
+            path = ox.shortest_path(graph, origin, target, weight=weightType)
             if path:
-                coords = [(workerGraph.nodes[n]['y'], workerGraph.nodes[n]['x']) for n in path]
+                coords = [(round(graph.nodes[n]['y'], 5), round(graph.nodes[n]['x'], 5)) for n in path]
                 return {'id': agentId, 'path': path, 'coords': coords, 'type': typeStr}
-    except Exception:
+    except:
         return None
     return None
 
-# --- SIMULATION LOGIC ---
+# --- LOGICA DI TRAFFICO E SEMAFORI ---
 
-def LoadGraphWithCache(coords, distRange, networkType):
-    """Handles loading/downloading graph with local cache protection."""
-    lat_r, lon_r = round(coords[0], 4), round(coords[1], 4)
-    cachePath = f"cache/map_{networkType}_{lat_r}_{lon_r}_{distRange}.graphml"
-    
-    if os.path.exists(cachePath):
-        return ox.load_graphml(cachePath)
-    
-    graph = ox.graph_from_point(coords, dist=distRange, network_type=networkType, simplify=True)
-    ox.save_graphml(graph, cachePath)
-    return graph
+def IsGreenLight(u, v, tick):
+    """Simula semafori alternati ogni 30 tick."""
+    cycle = 30
+    return (tick % cycle < 15) if (u + v) % 2 == 0 else (tick % cycle >= 15)
 
-def ApplyBarriers(graph, barriers):
-    """Modifies edge weights to simulate impassable road blocks."""
-    for barrier in barriers:
-        try:
-            u, v, key = ox.nearest_edges(graph, barrier[1], barrier[0])
-            graph[u][v][key]['weight'] = 999999 
-            if graph.has_edge(v, u):
-                for k in graph[v][u]: 
-                    graph[v][u][k]['weight'] = 999999
-        except:
-            continue
-
-def PopulationAgentsParallel(gDrive, gWalk, vehicles, pedestrian, timeOfDay):
-    nodesD, weightsD = PreProcessing(gDrive, timeOfDay)
-    nodesW, weightsW = PreProcessing(gWalk, timeOfDay)
-    
-    tasksD = [] # Task per il grafo Drive
-    tasksW = [] # Task per il grafo Walk
-    truckRatio = 0.20 if timeOfDay == "Morning" else 0.05
-
-    for i in range(vehicles):
-        o = random.choice(nodesD)
-        t = random.choices(nodesD, weights=weightsD, k=1)[0]
-        vType = "HeavyVehicle" if random.random() < truckRatio else "Vehicle"
-        # NOTA: Non passiamo più gDrive qui!
-        tasksD.append((f"v_{i}", o, t, 'weight', vType))
-
-    for j in range(pedestrian):
-        if nodesW:
-            o = random.choice(nodesW)
-            t = random.choices(nodesW, weights=weightsW, k=1)[0]
-            tasksW.append((f"p_{j}", o, t, 'length', 'Pedestrian'))
-
-    is_cloud = os.getenv("STREAMLIT_RUNTIME_ENV_CLOUD") == "true"
-    numWorkers = 2 if is_cloud else max(1, multiprocessing.cpu_count() - 1)
-    results = []
-
-    # Esecuzione per i Veicoli (usa gDrive)
-    with ProcessPoolExecutor(max_workers=numWorkers, initializer=InitWorker, initargs=(gDrive,)) as executor:
-        results.extend(list(executor.map(ComputePathWorker, tasksD)))
-
-    # Esecuzione per i Pedoni (usa gWalk)
-    with ProcessPoolExecutor(max_workers=numWorkers, initializer=InitWorker, initargs=(gWalk,)) as executor:
-        results.extend(list(executor.map(ComputePathWorker, tasksW)))
-    
-    finalAgents = []
-    for r in results:
-        if r:
-            agent = Agent(r['id'], r['path'], r['coords'], r['type'])
-            agent.isHeavy = (r['type'] == 'HeavyVehicle')
-            finalAgents.append(agent)
-            
-    return finalAgents
-
-def RunTicks(allAgents, duration, graph):
-    """Main simulation loop: handles movement, traffic lights, and recording."""
-    simulationData = [] 
-    for i in range(duration):
-        if i%5 == 0:
-            edgeOccupancy = GetEdgeOccupancy(allAgents)
-        else:
-            if 'edgeOccupancy' not in locals():
-                edgeOccupancy = {}       
-        for agent in allAgents:
-            if not agent.active: continue
-
-            agent.ticksAlive += 1
-            if agent.ticksAlive > duration or agent.stuckTicks > 15:
-                agent.active = False
-                continue
-
-            canMove = ValidateMovement(agent, graph, edgeOccupancy, i)
-
-            if canMove:
-                agent.step()
-                if agent.type == 'Vehicle' and agent.active: 
-                    agent.step() # Double speed for cars
-            else:
-                agent.stuckTicks += 1
-
-            if agent.active:
-                # Access pre-stored coordinates (Fixes the KeyError crash)
-                lat, lon = agent.pathCoords[agent.currentStep]
-                simulationData.append({
-                    'tick': i, 
-                    'agent_id': agent.id,
-                    'lat': lat, 
-                    'lon': lon,
-                    'type': agent.type, 
-                    'status': 'moving' if canMove else 'congested'
-                })
-    return simulationData
+def GetEdgeOccupancy(allAgents):
+    """Calcola quanto spazio occupano gli agenti su ogni strada."""
+    occupancy = {}
+    for agent in allAgents:
+        if agent.active and agent.currentStep < len(agent.path) - 1:
+            u, v = agent.path[agent.currentStep], agent.path[agent.currentStep + 1]
+            weight = 3.0 if agent.isHeavy else 1.0
+            occupancy[(u, v)] = occupancy.get((u, v), 0) + weight
+    return occupancy
 
 def ValidateMovement(agent, graph, occupancy, tick):
-    """Checks if an agent can move based on traffic constraints."""
-    # Pedestrians ignore vehicle-specific constraints (simplified)
-    if agent.type not in ['Vehicle', 'HeavyVehicle']:
-        return True 
+    """Controlla semafori e congestione prima di muovere l'agente."""
+    if agent.type == 'Pedestrian': return True 
+    if agent.currentStep >= len(agent.path) - 1: return False
     
-    if agent.currentStep >= len(agent.path) - 1:
-        return False
-
     u, v = agent.path[agent.currentStep], agent.path[agent.currentStep + 1]
     
-    # Traffic Light logic (cycles based on tick)
-    if graph.degree(u) > 2 and not IsGreenLight(u, v, tick):
+    # 1. Controllo Semaforico agli incroci
+    if graph.degree(u) > 2 and not IsGreenLight(u, v, tick): 
         return False
     
-    # Congestion/Capacity check
+    # 2. Controllo Congestione (Capacity)
     edgeData = graph.get_edge_data(u, v, 0)
     if edgeData:
         capacity = edgeData.get('capacity', 5)
@@ -213,18 +90,22 @@ def ValidateMovement(agent, graph, occupancy, tick):
             
     return True
 
-def GetEdgeOccupancy(allAgents):
-    """Calculates road load for the current tick."""
-    occupancy = {}
-    for agent in allAgents:
-        if agent.active and agent.currentStep < len(agent.path) - 1:
-            u, v = agent.path[agent.currentStep], agent.path[agent.currentStep + 1]
-            weight = 3.0 if getattr(agent, 'isHeavy', False) else 1.0
-            occupancy[(u, v)] = occupancy.get((u, v), 0) + weight
-    return occupancy
+# --- PRE-PROCESSING E BARRIERE ---
+
+def ApplyBarriers(graph, barriers):
+    if not barriers: return
+    nodes_list = list(graph.nodes(data=True))
+    node_coords = np.array([(d['y'], d['x']) for _, d in nodes_list])
+    tree = KDTree(node_coords)
+    for barrier in barriers:
+        _, idx = tree.query([barrier[0], barrier[1]])
+        target_node = nodes_list[idx][0]
+        for neighbor in list(graph.neighbors(target_node)):
+            for key in graph[target_node][neighbor]:
+                graph[target_node][neighbor][key]['weight'] = 999999
 
 def PreProcessing(graph, timeOfDay="Morning"):
-    """Determines destination popularity based on urban dynamics."""
+    """Calcola pesi e capacità delle strade."""
     VEHICLE_SPACE = 7.0 
     for u, v, k, data in graph.edges(data=True, keys=True):
         data['capacity'] = max(1, int(data.get('length', 1.0) / VEHICLE_SPACE))
@@ -233,58 +114,71 @@ def PreProcessing(graph, timeOfDay="Morning"):
     coords = np.array([(graph.nodes[n]['y'], graph.nodes[n]['x']) for n in nIds])
     weights = np.array([graph.degree(n) for n in nIds], dtype=float) + 1.0
     
+    # Flusso direzionale basato sull'orario
     if timeOfDay == "Morning":
         center = [coords[:,0].mean(), coords[:,1].mean()]
         dist = np.linalg.norm(coords - center, axis=1)
-        weights[dist < 0.008] *= 8.0 # Business center attraction
-    
+        weights[dist < 0.008] *= 8.0 
+        
     return nIds, weights / weights.sum()
 
-def IsGreenLight(u, v, tick):
-    cycle = 30
-    return (tick % cycle < 15) if (u + v) % 2 == 0 else (tick % cycle >= 15)
+# --- MAIN RUNNER ---
 
-def RunSimulation(coords, distRange, vehicles, pedestrian, duration, barriers, timeOfDay="Morning"):
-    try:
-        ox.settings.timeout = 180 
+def RunSimulation(coords, distRange, vehicles, pedestrian, duration, barriers, timeOfDay):
+    gDrive = ox.graph_from_point(coords, dist=distRange, network_type='drive', simplify=True)
+    gWalk = ox.graph_from_point(coords, dist=distRange, network_type='walk', simplify=True)
+    
+    roads = [{"path": [[round(gDrive.nodes[u]['x'], 5), round(gDrive.nodes[u]['y'], 5)], 
+                       [round(gDrive.nodes[v]['x'], 5), round(gDrive.nodes[v]['y'], 5)]]} 
+             for u,v in gDrive.edges()]
+
+    if barriers: ApplyBarriers(gDrive, barriers)
+    
+    # Preparazione Task
+    nodesD, weightsD = PreProcessing(gDrive, timeOfDay)
+    nodesW, _ = PreProcessing(gWalk, timeOfDay)
+    tasks = []
+    
+    truck_ratio = 0.15 if timeOfDay == "Morning" else 0.05
+    for i in range(vehicles):
+        o, t = random.choice(nodesD), random.choices(nodesD, weights=weightsD, k=1)[0]
+        v_type = 'HeavyVehicle' if random.random() < truck_ratio else 'Vehicle'
+        tasks.append((gDrive, f"v_{i}", o, t, 'weight', v_type))
+    
+    for j in range(pedestrian):
+        if nodesW:
+            o, t = random.choice(nodesW), random.choice(nodesW)
+            tasks.append((gWalk, f"p_{j}", o, t, 'length', 'Pedestrian'))
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(ComputePathWorker, tasks))
+    
+    allAgents = [Agent(r['id'], r['path'], r['coords'], r['type']) for r in results if r]
+    
+    # Loop di simulazione dinamico
+    simulationData = []
+    for i in range(duration):
+        # Calcoliamo l'occupazione delle strade ogni 5 tick per performance
+        if i % 5 == 0:
+            edgeOccupancy = GetEdgeOccupancy(allAgents)
         
-        gDrive = LoadGraphWithCache(coords, distRange, 'drive')
-        gWalk = LoadGraphWithCache(coords, distRange, 'walk')
-
-        if len(gDrive) == 0:
-            return pd.DataFrame(), []
-
-        nx.set_edge_attributes(gDrive, nx.get_edge_attributes(gDrive, 'length'), 'weight')
-        
-        try:
-            gDrive = ox.truncate.largest_component(gDrive, strongly=True)
-            gWalk = ox.truncate.largest_component(gWalk, strongly=True)
-        except:
-            pass 
-
-        if barriers:
-            ApplyBarriers(gDrive, barriers)
+        for agent in allAgents:
+            if not agent.active: continue
             
-        allAgents = PopulationAgentsParallel(gDrive, gWalk, vehicles, pedestrian, timeOfDay)
-        
-        if not allAgents:
-            return pd.DataFrame(), []
-
-        results = RunTicks(allAgents, duration, gDrive)
-        df = pd.DataFrame(results)
-        
-        # PREPARAZIONE ROADS 
-        roads = []
-        for u, v, data in gDrive.edges(data=True):
-            if 'geometry' in data:
-                path = list(data['geometry'].coords)
+            # Validazione movimento (Traffico + Semafori)
+            if ValidateMovement(agent, gDrive, edgeOccupancy if 'edgeOccupancy' in locals() else {}, i):
+                agent.step()
+                # I veicoli si muovono più velocemente dei pedoni
+                if agent.type != 'Pedestrian' and agent.active:
+                    agent.step()
             else:
-                path = [[gDrive.nodes[u]['x'], gDrive.nodes[u]['y']], 
-                        [gDrive.nodes[v]['x'], gDrive.nodes[v]['y']]]
-            roads.append({"path": path})
+                agent.stuckTicks += 1
 
-        return df, roads
-
-    except Exception as e:
-        print(f"DEBUG ENGINE: {e}")
-        return pd.DataFrame(), []
+            # Salvataggio dati (Downsampling)
+            if agent.active and (i == 0 or i % 5 == 0):
+                lat, lon = agent.pathCoords[agent.currentStep]
+                simulationData.append({
+                    'tick': i, 'agent_id': agent.id, 'lat': lat, 'lon': lon, 'type': agent.type
+                })
+                
+    return pd.DataFrame(simulationData), roads
