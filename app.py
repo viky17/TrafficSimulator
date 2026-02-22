@@ -1,4 +1,3 @@
-from interface import setup,simulation,report
 import streamlit as st 
 
 st.set_page_config(layout="wide", page_title="Urban Mobility Simulator")
@@ -55,18 +54,24 @@ st.markdown("""
 
 
 
-if 'page' not in st.session_state:
-    st.session_state['page'] = 'setup'
 
-try:
-    if st.session_state['page'] == 'setup':
-        setup.show()
-    elif st.session_state['page'] == 'simulation':
-        simulation.show()
-    elif st.session_state['page'] == 'report':
-        report.show()
-except Exception as e:
-    st.error(f" ERRORE RILEVATO: {e}")
-    st.write("Dettaglio tecnico dell'errore:")
-    st.exception(e) # Questo ti mostra esattamente in quale riga di quale file c'è il problema
+def main():
+    from interface import setup, simulation, report
+    if 'page' not in st.session_state:
+        st.session_state['page'] = 'setup'
 
+    try:
+        if st.session_state['page'] == 'setup':
+            setup.show()
+        elif st.session_state['page'] == 'simulation':
+            simulation.show()
+        elif st.session_state['page'] == 'report':
+            report.show()
+    except Exception as e:
+        st.error(f" ERRORE RILEVATO: {e}")
+        st.write("Dettaglio tecnico dell'errore:")
+        st.exception(e) # Questo ti mostra esattamente in quale riga di quale file c'è il problema
+
+
+if __name__ == "__main__":
+    main()
