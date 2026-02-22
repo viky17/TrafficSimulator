@@ -1,13 +1,23 @@
+import multiprocessing
+import os
+
+try:
+    # Controlliamo se siamo su Streamlit Cloud (dove 'spawn' potrebbe non essere permesso)
+    if not os.getenv("STREAMLIT_RUNTIME_ENV_CLOUD"):
+        if multiprocessing.get_start_method(allow_none=True) is None:
+            multiprocessing.set_start_method('spawn', force=True)
+except RuntimeError:
+    pass
+
 import osmnx as ox
 import pandas as pd
 import random
 import time
 import networkx as nx
-import os
 import numpy as np
 from scipy.spatial import KDTree
 from concurrent.futures import ProcessPoolExecutor
-import multiprocessing
+
 
 # Create cache directory
 if not os.path.exists("cache"):
@@ -56,19 +66,19 @@ def InitWorker(graph):
     workerGraph = graph
 
 def ComputePathWorker(args):
-    """Calcola il percorso usando il grafo già presente nella memoria del core."""
     global workerGraph
     agentId, origin, target, weightType, typeStr = args
     
+    if workerGraph is None: return None
+
     try:
-        # Usiamo workerGraph (già caricato) invece di passarlo tra i task
-        path = ox.shortest_path(workerGraph, origin, target, weight=weightType)
-        if path:
-            cost = nx.path_weight(workerGraph, path, weight=weightType)
-            if cost < 500000:
+        # Verifichiamo se esiste un percorso prima di calcolarlo
+        if nx.has_path(workerGraph, origin, target):
+            path = ox.shortest_path(workerGraph, origin, target, weight=weightType)
+            if path:
                 coords = [(workerGraph.nodes[n]['y'], workerGraph.nodes[n]['x']) for n in path]
                 return {'id': agentId, 'path': path, 'coords': coords, 'type': typeStr}
-    except:
+    except Exception:
         return None
     return None
 
@@ -119,7 +129,8 @@ def PopulationAgentsParallel(gDrive, gWalk, vehicles, pedestrian, timeOfDay):
             t = random.choices(nodesW, weights=weightsW, k=1)[0]
             tasksW.append((f"p_{j}", o, t, 'length', 'Pedestrian'))
 
-    numWorkers = max(1, multiprocessing.cpu_count() - 1)
+    is_cloud = os.getenv("STREAMLIT_RUNTIME_ENV_CLOUD") == "true"
+    numWorkers = 2 if is_cloud else max(1, multiprocessing.cpu_count() - 1)
     results = []
 
     # Esecuzione per i Veicoli (usa gDrive)
@@ -234,31 +245,46 @@ def IsGreenLight(u, v, tick):
     return (tick % cycle < 15) if (u + v) % 2 == 0 else (tick % cycle >= 15)
 
 def RunSimulation(coords, distRange, vehicles, pedestrian, duration, barriers, timeOfDay="Morning"):
-    """Main entry point for running the simulation."""
     try:
+        ox.settings.timeout = 180 
+        
         gDrive = LoadGraphWithCache(coords, distRange, 'drive')
         gWalk = LoadGraphWithCache(coords, distRange, 'walk')
 
+        if len(gDrive) == 0:
+            return pd.DataFrame(), []
+
         nx.set_edge_attributes(gDrive, nx.get_edge_attributes(gDrive, 'length'), 'weight')
-        gDrive = ox.truncate.largest_component(gDrive, strongly=True)
-        gWalk = ox.truncate.largest_component(gWalk, strongly=True)
+        
+        try:
+            gDrive = ox.truncate.largest_component(gDrive, strongly=True)
+            gWalk = ox.truncate.largest_component(gWalk, strongly=True)
+        except:
+            pass 
 
         if barriers:
             ApplyBarriers(gDrive, barriers)
             
         allAgents = PopulationAgentsParallel(gDrive, gWalk, vehicles, pedestrian, timeOfDay)
         
-        # Passing gDrive to RunTicks for traffic light and congestion lookups
+        if not allAgents:
+            return pd.DataFrame(), []
+
         results = RunTicks(allAgents, duration, gDrive)
+        df = pd.DataFrame(results)
         
-        # Prepare background road layer for Pydeck
+        # PREPARAZIONE ROADS 
         roads = []
         for u, v, data in gDrive.edges(data=True):
-            path = list(data['geometry'].coords) if 'geometry' in data else \
-                   [[gDrive.nodes[u]['x'], gDrive.nodes[u]['y']], [gDrive.nodes[v]['x'], gDrive.nodes[v]['y']]]
+            if 'geometry' in data:
+                path = list(data['geometry'].coords)
+            else:
+                path = [[gDrive.nodes[u]['x'], gDrive.nodes[u]['y']], 
+                        [gDrive.nodes[v]['x'], gDrive.nodes[v]['y']]]
             roads.append({"path": path})
 
-        return pd.DataFrame(results), roads
+        return df, roads
+
     except Exception as e:
-        print(f"ERRORE RUNTIME: {e}")
+        print(f"DEBUG ENGINE: {e}")
         return pd.DataFrame(), []
