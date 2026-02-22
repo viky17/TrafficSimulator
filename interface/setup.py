@@ -3,12 +3,18 @@ from streamlit_folium import st_folium
 import folium 
 from geopy.geocoders import Nominatim 
 from geopy.distance import geodesic
-from engine import RunSimulation
 import pandas as pd
+import engine 
+
+# --- WRAPPER CACHE: Risolve i conflitti di runtime tra Streamlit e i Worker ---
+@st.cache_data(show_spinner=False)
+def cached_run_simulation(coords, distRange, vehicles, pedestrian, duration, barriers, timeOfDay):
+    """Esegue la simulazione e memorizza il risultato nel thread principale."""
+    return engine.RunSimulation(coords, distRange, vehicles, pedestrian, duration, barriers, timeOfDay)
 
 @st.cache_data
 def getCordinates(address):
-    geolocator = Nominatim(user_agent="my_traffic_sim_app")
+    geolocator = Nominatim(user_agent="urban_traffic_sim_v2")
     try:
         location = geolocator.geocode(address)
         if location:
@@ -24,34 +30,37 @@ def handle_search():
         if new_pos:
             st.session_state.coords = new_pos
             st.session_state['city_name'] = query.title()
+            st.session_state.barriers = [] # Reset barriere al cambio citta
             st.rerun()
 
 def show():
+    """Funzione principale chiamata da app.py per visualizzare l'interfaccia"""
+    
+    # Inizializzazione Session State
     if 'coords' not in st.session_state:
-        st.session_state.coords = (51.509865, -0.118092)
+        st.session_state.coords = (45.4642, 9.1900)  # Default: Milano
     if 'barriers' not in st.session_state:
         st.session_state.barriers = []
+    if 'city_name' not in st.session_state:
+        st.session_state['city_name'] = "Milan, Italy"
 
-    # Sidebar UI
+    # --- SIDEBAR: CONFIGURAZIONE PARAMETRI ---
     with st.sidebar:
         st.header("Settings")
         
-        # 1. Parametri sempre presenti: non spariranno mai
         add_vehiclesInput = st.number_input("Vehicles", 1, max_value=50000, value=1000, step=500)
         add_pedestrianInput = st.number_input("Pedestrians", 0, max_value=50000, value=500, step=100)
         add_simulationDuration = st.number_input("Duration (Ticks)", 1, 1000, 150)
         
-        time_choice = st.sidebar.radio(
+        time_choice = st.radio(
             "Time Slot:",
             options=["Morning", "Evening"],
-            index=0, # Default su Morning
+            index=0,
             help="Determine the direction of the flow (toward the center in the morning, outward in the evening)"
         )
-        st.markdown("---")
         
-        # 2. Editor dei blocchi come sezione dedicata
+        st.markdown("---")
         st.subheader("Blocks Editor")
-        # Un toggle invece di un radio switch pesante
         edit_mode = st.toggle("Enable Click-to-Block", value=False, help="Enable this to add barriers by clicking on the map")
         
         col_btn1, col_btn2 = st.columns(2)
@@ -64,11 +73,12 @@ def show():
                 st.session_state.barriers = []
                 st.rerun()
         
-        # Mostra il contatore dei blocchi attivi
         st.caption(f"Active barriers: {len(st.session_state.barriers)}")
-        add_submitButton = st.button(" START SIMULATION", type="primary", use_container_width=True)
+        st.markdown("---")
+        
+        add_submitButton = st.button("START SIMULATION", type="primary", use_container_width=True)
 
-    # Main UI
+    # --- INTERFACCIA PRINCIPALE ---
     st.markdown("<h2 style='margin-bottom: 0rem;'>Urban Traffic Simulator</h2>", unsafe_allow_html=True)
     
     col_txt, col_sld = st.columns([2, 2])
@@ -77,76 +87,82 @@ def show():
     with col_sld:
         selectRange = st.slider("Range (m)", 100, 3000, 500)
 
-    # Map Rendering
-    m = folium.Map(location=st.session_state.coords, zoom_start=16)
-    folium.Circle(location=st.session_state.coords, radius=selectRange, color="yellow", fill=True).add_to(m)
+    # Rendering Mappa Folium (Stile OpenStreetMap)
+    m = folium.Map(location=st.session_state.coords, zoom_start=16, tiles="OpenStreetMap")
+    
+    # Area di Simulazione (Cerchio Giallo)
+    folium.Circle(
+        location=st.session_state.coords, 
+        radius=selectRange, 
+        color="yellow", 
+        fill=True, 
+        fill_opacity=0.15
+    ).add_to(m)
+    
+    # Marker Barriere (Icona X rossa)
     for b in st.session_state.barriers:
         folium.Marker(location=b, icon=folium.Icon(color='red', icon='times', prefix='fa')).add_to(m)
     
-    map_key = f"map_{st.session_state.coords[0]}_{st.session_state.coords[1]}"
-    st_data = st_folium(m, use_container_width=True, height=500, key=map_key)
+    # Chiave dinamica per forzare l'aggiornamento della mappa solo al cambio coordinate o barriere
+    map_key = f"map_{st.session_state.coords[0]}_{st.session_state.coords[1]}_{len(st.session_state.barriers)}"
+    st_data = st_folium(m, width='stretch', height=500, key=map_key)
 
-    # Map Logic
+    # Logica interazione Mappa
     if st_data and st_data.get("last_clicked"):
         click_lat = st_data["last_clicked"]["lat"]
         click_lng = st_data["last_clicked"]["lng"]
+        click_pos = (click_lat, click_lng)
+        
         if edit_mode:
-            # Modalità Blocchi: calcola distanza dal centro
-            dist = geodesic(st.session_state.coords, (click_lat, click_lng)).meters
+            # Controllo distanza dal centro per validita barriera
+            dist = geodesic(st.session_state.coords, click_pos).meters
             if dist <= selectRange:
-                # Evita duplicati
                 if [click_lat, click_lng] not in st.session_state.barriers:
                     st.session_state.barriers.append([click_lat, click_lng])
                     st.rerun()
         else:
-            # Modalità Navigazione: sposta il centro
+            # Spostamento centro simulazione
             if round(click_lat, 4) != round(st.session_state.coords[0], 4):
                 st.session_state.coords = (click_lat, click_lng)
                 st.rerun()
                 
-    # --- SIMULATION TRIGGER ---
+    # --- PROCESSO DI AVVIO SIMULAZIONE ---
     if add_submitButton:
-        st.session_state['page'] = 'simulation'
-        # Inizializzazione city_name se mancante
         if 'city_name' not in st.session_state:
             st.session_state['city_name'] = "Custom Area"
 
-        # Esecuzione Engine
-        with st.status(" Engine Working...", expanded=True) as status:
-            st.write("Downloading OSM data and calculating paths...")
+        with st.status("Engine Working...", expanded=True) as status:
+            st.write("Downloading network data and calculating paths...")
+            
             try:
-                df_results, roads = RunSimulation(
+                # Esecuzione tramite wrapper cache
+                df_results, roads = cached_run_simulation(
                     coords=st.session_state.coords, 
                     distRange=selectRange, 
                     vehicles=add_vehiclesInput, 
                     pedestrian=add_pedestrianInput, 
                     duration=add_simulationDuration, 
                     barriers=st.session_state.barriers,
-                    timeOfDay="Morning" # Assicurati che il nome sia timeOfDay
+                    timeOfDay=time_choice
                 )
-                if df_results is not None:
-                    st.write(f" Data generated: {len(df_results)} rows.")
                 
-                status.update(label="Simulation Complete!", state="complete", expanded=False)
+                if df_results is not None and not df_results.empty:
+                    st.write(f"Success: Generated {len(df_results)} data points.")
+                    
+                    # Persistenza dati nel Session State
+                    st.session_state['results'] = df_results
+                    st.session_state['roads_data'] = roads
+                    st.session_state['selectRange'] = selectRange
+                    st.session_state['vehiclesNumber'] = add_vehiclesInput
+                    st.session_state['pedestrianNumber'] = add_pedestrianInput
+                    
+                    status.update(label="Simulation Complete", state="complete", expanded=False)
+                    st.session_state['page'] = 'simulation'
+                    st.rerun()
+                else:
+                    status.update(label="Simulation Failed", state="error")
+                    st.error("No paths could be generated. Try increasing the range or removing barriers.")
+            
             except Exception as e:
-                st.error(f"Engine Error: {e}")
-                return
-
-        if df_results is not None and not df_results.empty:
-            # Salvataggio dati nel Session State
-            st.session_state['results'] = df_results
-            st.session_state['roads_data'] = roads
-            st.session_state['selectRange'] = selectRange
-            st.session_state['vehiclesNumber'] = add_vehiclesInput
-            st.session_state['pedestrianNumber'] = add_pedestrianInput
-            
-            # CAMBIO PAGINA
-            
-            # Notifica a video prima del rerun
-            st.toast("Switching to Simulation View...")
-            
-            # RERUN FORZATO
-            st.rerun()
-        else:
-
-            st.error("The simulation returned no data. Try increasing the range or changing location.")
+                status.update(label="Engine Error", state="error")
+                st.error(f"Critical error during simulation: {e}")
