@@ -1,8 +1,10 @@
-altair==4.2.2
 streamlit
+streamlit-folium
+folium
 osmnx
 networkx
 pandas
 numpy
-pydeck
 scipy
+geopy
+pydeck
