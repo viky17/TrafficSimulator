@@ -37,11 +37,17 @@ def show():
 
         with col_btn:
             st.markdown("<div style='padding-top: 25px;'></div>", unsafe_allow_html=True)
-            if st.button("Generate Report", use_container_width=True, type="primary"):
+            if st.button("Generate Report", width='stretch', type="primary"):
                 st.session_state['page']='report'
                 st.rerun()
                 
-        data_filtrata = df[df['tick'] == currentTick]
+        # Trova tutti i tick effettivamente presenti nel database
+        ticks_presenti = df['tick'].unique()
+        # Trova il tick più vicino (uguale o precedente) a quello selezionato dallo slider
+        # Questo evita che la mappa sia vuota nei tick "saltati" dal downsampling
+        tick_effettivo = max([t for t in ticks_presenti if t <= currentTick], default=0)
+        # Filtra i dati usando il tick_effettivo invece di quello dello slider
+        data_filtrata = df[df['tick'] == tick_effettivo]
         activeAgents = len(data_filtrata)
         trafficState = round((currentTick / tick_max) * 100) if tick_max > 0 else 0
 
