@@ -70,3 +70,18 @@ sequenceDiagram
     Manager->>Utils: GetEdgeOccupancy(allAgents)
     Utils-->>Manager: return current_congestion (Dictionary)
     
+    loop For each active Agent
+        Manager->>Utils: ValidateMovement(agent,gDrive,current_congestion,tick)
+        Utils-->>Manager: return isValid
+
+        alt isValid is True
+            Manager->>Agent: step()
+            Agent->>Agent: update currentStep
+        else Movement Blocked
+            Manager->>Agent: increment stuckTicks
+        end
+        
+        Manager->>Agent: check if destination reached
+    end
+    
+    Manager-->>Client: return data_tick
