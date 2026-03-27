@@ -1,5 +1,6 @@
 ### **UML Class Diagram**
 
+```mermaid
 classDiagram
     direction TB
 
@@ -50,13 +51,15 @@ classDiagram
     Manager ..> Utils : uses for calculations
     Agent ..> Utils : validated by
 
-### Sequence Diagram
+
+```
+
+### *Sequence Diagram*
 
 sequenceDiagram
     participant API as Client
     participant M as Manager
     participant U as Utils
     participant A as Agent
-    
 
 
