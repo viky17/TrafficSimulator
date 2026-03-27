@@ -6,12 +6,18 @@ classDiagram
 
     class Manager{
         +id: String
+        +coords: List
+        +distRange: int
         +status: String
+        +agents: List
+        +raodsGeometry: List
+        +spawn_errors: int
+        +tick_attuale: int
+        +current_congestion: int
         -gDrive: Graph
         -gWalk: Graph
-        +agents: List
         +buildWorld(barriers)
-        +populationWorld(vehicles,pedestrian,tiomOfDay)
+        +populationWorld(vehicles, pedestrian, timeOfDay)
         +step()
     }
 
