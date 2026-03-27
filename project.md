@@ -20,8 +20,6 @@ classDiagram
         +populationWorld(vehicles, pedestrian, timeOfDay)
         +step() List
     }
-    note for Manager "status: contains simulation state.<br/>current_congestion: current traffic situation.<br/>raodsGeometry: list of coordinates."
-
     class Agent{
         +id: String
         +type: String
@@ -35,8 +33,6 @@ classDiagram
         -currentStep: integer
         +step()
     }
-    note for Agent "stuckTicks: counts ticks the agent remained stuck.<br/>isHeavy: if True the agent occupies more road space.<br/>currentStep: points to current position in path list."
-
     class Utils{
         <<Utility>>
         +ComputePathWorker(args: Tuple) Dictionary
