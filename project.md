@@ -50,9 +50,12 @@ classDiagram
     Manager "1" *-- "*" Agent : manages
     Manager ..> Utils : uses for calculations
     Agent ..> Utils : validated by
-
-
 ```
+Il compito della classe Manager è quello di coordinare l'intero ciclo di vita della simulazione, dalla creazione del mondo alla gestione dei singoli ticks. I grafi stradali gDrive, specializzato per i veicoli, e gWalk,specializzato per i pedono, sono ricavati tramite la librearia OSMnx (OpenStreetMap). La geometria stradale (roadsGeometry) viene ottenuta estrando le coordinate dei nodi e degli archi per permettere al Client di disengare le strade senza processare l'intero oggetto grafo.   
+Ogni Agent rappresenta un'entità dentro il Manger. il path è ottenuto tramite l'algoritmo di Dijkstra, tuttavia l'oggetto necessita per muoversi anche di pathCoords, ovvero le coordinate geografiche reali di quei nodi. isHeavy determina l'impatto dell'agente sul traffico, se un agente è pesante (es. camion), il suo contributo alla congestione stradale è maggiore, questo dato è fondamentale durante la fase di GetEdgeOccupancy per capire il peso di una strada. stuckTicks è un accumultaore, ogni volta che il Manager nega un movimento a un Agent, stuckTicks aumenta. 
+Le Utils sono un insieme di regole matematiche che il Manager consulta. ComputePathWorker prende la mappa di OpenStreetMap e calcola la strada più veloce usando l'algoritmo di Dijkstra. Se una strada è chiusa il Manager lo segnala.<br/>
+isGreenLight gestisce il ritmo dei semafori in base al tempo, mentre ValidateMovement blocca un agent se la stra davanti è già troppo piena. GetEdgeOccupancy conta quanti veicoli ci sono su ogni segmento di strada, dando un peso maggiore ai mezzi pesanti per capire dove si formano gli ingorghi. ApplyBarriers elimina fisicamente i collegamenti, ad esempio strade chiuse per lavori, mentre PreProcessing concentra il traffico verso punti di interesse durante la mattina mentre si concentra verso la perifieria la sera, questa situazione è modellata dalla variabile timeOfDay. 
+
 
 ### *Sequence Diagram*
 
