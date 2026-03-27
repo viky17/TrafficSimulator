@@ -2,7 +2,7 @@
 
 ```mermaid
 classDiagram
-   
+   direction TB
 
     class Manager{
         +id: String
@@ -43,7 +43,7 @@ classDiagram
       +IsGreenLight(u: integer, v: integer, tick: integer) Boolean
       +GetEdgeOccupancy(allAgents: List): Dictionary
       +ValidateMovement(agent, graph, occupancy, tick): Boolean
-      +ApplyBarriers(graph, barriers: integer): void
+      +ApplyBarriers(graph, barriers: integer)
       +PreProcessing(graph, timeOfDay: String): Tuple
    }
 Manager "1" *-- "*" Agent
