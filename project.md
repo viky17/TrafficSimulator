@@ -59,36 +59,35 @@ classDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Client as API/Frontend
-    participant Manager as Simulation Manager
-    participant Utils as Utility Module
-    participant Agent as Agent Instance
+    participant Client
+    participant Manager
+    participant Utils
+    participant Agent
 
-    Note over Client, Manager: PHASE 1: Initialization
+    Note over Client, Manager: Initialization Phase
     Client->>Manager: buildWorld(barriers)
     Manager->>Utils: ApplyBarriers(graph, barriers)
     Manager->>Utils: PreProcessing(graph)
     Manager-->>Client: status = "WORLD_READY"
 
-    Note over Client, Manager: PHASE 2: Population
+    Note over Client, Manager: Population Phase
     Client->>Manager: populationWorld(counts)
     Manager->>Utils: ComputePathWorker(tasks)
-    Utils-->>Manager: return paths (Dictionary)
-    Manager->>Agent: Create new Instances
+    Utils-->>Manager: return paths
+    Manager->>Agent: Create Instances
     Manager-->>Client: status = "POPULATED"
 
-    Note over Client, Manager: PHASE 3: Simulation Loop (Step)
-    rect rgb(240, 245, 255)
-        Client->>Manager: step()
-        Manager->>Utils: GetEdgeOccupancy(allAgents)
-        
-        loop For each active Agent
-            Manager->>Utils: ValidateMovement(agent, occupancy)
-            alt if isValid
-                Manager->>Agent: step()
-            else if blocked
-                Manager->>Agent: increment stuckTicks
-            end
+    Note over Client, Manager: Simulation Loop
+    Client->>Manager: step()
+    Manager->>Utils: GetEdgeOccupancy(allAgents)
+    
+    loop For each active Agent
+        Manager->>Utils: ValidateMovement(agent, occupancy)
+        alt isValid is True
+            Manager->>Agent: step()
+            Agent->>Agent: update currentStep
+        else Movement Blocked
+            Manager->>Agent: increment stuckTicks
         end
-        Manager-->>Client: return positions_list
     end
+    Manager-->>Client: return data_tick
