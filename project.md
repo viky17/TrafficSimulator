@@ -50,3 +50,14 @@ classDiagram
     Manager "1" *-- "*" Agent : manages
     Manager ..> Utils : uses for calculations
     Agent ..> Utils : validated by
+
+### Sequence Diagram
+
+sequenceDiagram
+    participant API as Client
+    participant M as Manager
+    participant U as Utils
+    participant A as Agent
+    
+
+
