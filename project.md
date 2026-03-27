@@ -69,4 +69,4 @@ sequenceDiagram
 
     Manager->>Utils: GetEdgeOccupancy(allAgents)
     Utils-->>Manager: return current_congestion (Dictionary)
-    end
+    
