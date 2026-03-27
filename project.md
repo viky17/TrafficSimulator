@@ -20,7 +20,7 @@ classDiagram
         +populationWorld(vehicles, pedestrian, timeOfDay)
         +step()
     }
-
+      note for Manager "status: contiene lo stato della simulazione.<br/>current_congestion: attuale situazione del traffico.<br/>raodsGeometry: lista di coordinate."
     class Agent{
         +id: String
         +type: String
