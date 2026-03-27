@@ -96,47 +96,52 @@ sequenceDiagram
 ### *State Diagram*
 
 ```mermaid
-stateDiagram-v2
+stateDiagram-
     direction TB
 
-    [*] --> CREATED : Instance initialized
+    [*] --> CREATED : Manager() Initialization
     
     state CREATED {
         direction TB
-        [*] --> gDrive_None
-        gDrive_None --> ApplyBarriers : buildWorld(barriers)
-        ApplyBarriers --> PreProcessing : Weights & Capacity
-        Note right of PreProcessing : Calculates road capacity<br/>and timeOfDay weights.
+        State_1: Waiting for buildWorld()
+        State_2: Running ApplyBarriers()
+        State_3: Running PreProcessing()
+        
+        State_1 --> State_2
+        State_2 --> State_3
     }
 
     CREATED --> WORLD_READY : status = "WORLD_READY"
-
+    
     state WORLD_READY {
         direction TB
-        [*] --> agents_Empty
-        agents_Empty --> ComputePathWorker : populationWorld(counts)
-        Note left of ComputePathWorker : Parallel Dijkstra paths<br/>Increments spawn_errors
-        ComputePathWorker --> agents_Created : Agent instances
+        State_4: Waiting for populationWorld()
+        State_5: Running ComputePathWorker()
+        State_6: Initializing Agent Instances
+        
+        State_4 --> State_5
+        State_5 --> State_6
     }
 
     WORLD_READY --> POPULATED : status = "POPULATED"
 
     state RUNNING {
         direction TB
-        [*] --> GetEdgeOccupancy : step() every 5 ticks
+        Step_Update: tick_attuale++
         
-        state ValidateMovement_Logic {
-            direction TB
-            [*] --> IsGreenLight
-            IsGreenLight --> CapacityCheck : if Green
-            CapacityCheck --> MovementResult : if space exists
-        }
+        Traffic_Scan: GetEdgeOccupancy(allAgents)
         
-        GetEdgeOccupancy --> ValidateMovement_Logic
-        MovementResult --> GetEdgeOccupancy : tick_attuale++
+        Validation: ValidateMovement(agent, occupancy)
+        
+        Movement: Agent.step() OR stuckTicks++
+        
+        Step_Update --> Traffic_Scan
+        Traffic_Scan --> Validation
+        Validation --> Movement
+        Movement --> Step_Update : Next Tick Loop
     }
 
-    POPULATED --> RUNNING : status = "RUNNING"
+    POPULATED --> RUNNING : status = "RUNNING" (first step call)
     
-    RUNNING --> FINISHED : all agents inactive
+    RUNNING --> FINISHED : All Agents active = False
     FINISHED --> [*]
