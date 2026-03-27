@@ -67,7 +67,6 @@ sequenceDiagram
     Client->>Manager: step()
     Manager->>Manager: increment tick_attuale
 
-    rect rgb(240,240,240)
     Note over Manager, Utils: Optimization: Every 5 ticks
     Manager->>Utils: GetEdgeOccupancy(allAgents)
     Utils-->>Manager: return current_congestion (Dictionary)
