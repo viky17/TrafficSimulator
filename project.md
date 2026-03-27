@@ -1,6 +1,5 @@
 ### **UML Class Diagram**
 
-```mermaid
 classDiagram
     direction TB
 
