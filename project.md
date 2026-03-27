@@ -18,7 +18,7 @@ classDiagram
         -gWalk: Graph
         +buildWorld(barriers)
         +populationWorld(vehicles, pedestrian, timeOfDay)
-        +step(): List
+        +step() List
     }
       note for Manager "status: contiene lo stato della simulazione.<br/>current_congestion: attuale situazione del traffico.<br/>raodsGeometry: lista di coordinate."
     class Agent{
@@ -39,11 +39,13 @@ classDiagram
 
    class Utils{
       <<Utility>>
-      +ComputePathWorker(args: Tuple): Dictionary
+      +ComputePathWorker(args: Tuple) Dictionary
       +IsGreenLight(u: integer, v: integer, tick: integer) Boolean
-      +GetEdgeOccupancy(allAgents: List): Dictionary
-      +ValidateMovement(agent, graph, occupancy, tick): Boolean
+      +GetEdgeOccupancy(allAgents: List) Dictionary
+      +ValidateMovement(agent, graph, occupancy, tick) Boolean
       +ApplyBarriers(graph, barriers: integer)
-      +PreProcessing(graph, timeOfDay: String): Tuple
+      +PreProcessing(graph, timeOfDay: String) Tuple
    }
 Manager "1" *-- "*" Agent
+Manager ..> Utils : usa per calcoli
+Agent ..> Utils : validato da
