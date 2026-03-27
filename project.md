@@ -57,31 +57,38 @@ classDiagram
 ### *Sequence Diagram*
 
 ```mermaid
-
 sequenceDiagram
-    participant Client
-    participant Manager
-    participant Utils
-    participant Agent
+    autonumber
+    participant Client as API/Frontend
+    participant Manager as Simulation Manager
+    participant Utils as Utility Module
+    participant Agent as Agent Instance
 
-    Client->>Manager: step()
-    Manager->>Manager: increment tick_attuale
+    Note over Client, Manager: PHASE 1: Initialization
+    Client->>Manager: buildWorld(barriers)
+    Manager->>Utils: ApplyBarriers(graph, barriers)
+    Manager->>Utils: PreProcessing(graph)
+    Manager-->>Client: status = "WORLD_READY"
 
-    Manager->>Utils: GetEdgeOccupancy(allAgents)
-    Utils-->>Manager: return current_congestion (Dictionary)
-    
-    loop For each active Agent
-        Manager->>Utils: ValidateMovement(agent,gDrive,current_congestion,tick)
-        Utils-->>Manager: return isValid
+    Note over Client, Manager: PHASE 2: Population
+    Client->>Manager: populationWorld(counts)
+    Manager->>Utils: ComputePathWorker(tasks)
+    Utils-->>Manager: return paths (Dictionary)
+    Manager->>Agent: Create new Instances
+    Manager-->>Client: status = "POPULATED"
 
-        alt isValid is True
-            Manager->>Agent: step()
-            Agent->>Agent: update currentStep
-        else Movement Blocked
-            Manager->>Agent: increment stuckTicks
-        end
+    Note over Client, Manager: PHASE 3: Simulation Loop (Step)
+    rect rgb(240, 245, 255)
+        Client->>Manager: step()
+        Manager->>Utils: GetEdgeOccupancy(allAgents)
         
-        Manager->>Agent: check if destination reached
+        loop For each active Agent
+            Manager->>Utils: ValidateMovement(agent, occupancy)
+            alt if isValid
+                Manager->>Agent: step()
+            else if blocked
+                Manager->>Agent: increment stuckTicks
+            end
+        end
+        Manager-->>Client: return positions_list
     end
-    
-    Manager-->>Client: return data_tick
