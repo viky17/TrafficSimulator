@@ -96,7 +96,7 @@ sequenceDiagram
 ### *State Diagram*
 
 ```mermaid
-stateDiagram-
+stateDiagram-v2
     direction TB
 
     [*] --> CREATED : Manager() Initialization
