@@ -152,3 +152,12 @@ stateDiagram-v2
     
     RUNNING --> FINISHED : All Agents active = False
     FINISHED --> [*]
+```
+
+Il diagramma di stato definisce le regole di utilizzo del simulatore. La progressione non è libera ma vincolata dal completamento di operazioni atomiche che garantiscono la stabilità del sistema.
+
+La transizione CREATED --> WORLD_READY è una transizione senza punto di ritorno, una volta confermato lo stato di WORLD_READY la topologia della mappa viene sigillata. Questo garantisce che il calcolo dei percorsi avvenga su un modello statico, inoltre se permettissimo di cambiare la mappa mentre gli agenti calcolano i percorsi rischierremmo errori di segmentazione o problemi di agenti "fantasm".
+
+Lo stato POPULATED si comporta da checkpoint prima dell'esecuzione. Separa la fase di allocazione della memoria (creazione degli agenti) dalla fase di elaborazione dei calcoli (movimento). Questo permette di verificare la qualità del popolamento tramite la variabile spawn_errors. Se troppi agenti sono falliti a causa di barriere troppo restrittive il sistema permette di resettare la simulazione senza averi mai avviato il loop di RUNNING, risparmiando risorse computazionali.
+
+Il loop di simulazione è l'unico momento in cui il sistema è aperto al cambiamento dinamico, ma segue comunque una gerarchia rigida:
