@@ -53,6 +53,10 @@ Agents are the different entities managed by the Manager. Each agent follows a p
 
 The Utils class is packed with the math and logic the Manager needs. ComputePathWorker fetches map data and figures out the shortest routes using Dijkstra’s algorithm, and if a road is blocked, the Manager flags it. isGreenLight handles how traffic lights switch depending on the simulation tick. ValidateMovement steps in to stop an agent if its next road is packed already. GetEdgeOccupancy checks how many vehicles are on each piece of road, bumping up the count for heavy vehicles so it’s easy to spot upcoming traffic jams. ApplyBarriers takes out entire road connections, which you’d do for things like construction closures. PreProcessing nudges traffic toward busy spots in the morning and out to the edges later, using timeOfDay to set this morning/evening shift in behavior.
 
+*Simulation loop*: all'inizio di ogni Tick, il Manager scatta una "fotografia" dello stato globale delle strade tramite GetEdgeOccupancy. Questo passaggio serve a calcolare quanti veicoli occupano ogni segmento di strada in quel preciso istante. 
+Per ogni agente ancora attivo il Manager interroga la funzione ValidateMovement, qui il sistema verifica se il semaforo è verde e se la strada di destinazione ha ancora capacità fisica per ospitare l'agente considerato. Se la funzione da esito positivo, l'agente esegue un passo nella simulazione tramite il metodo step(). Se il movimento viene negato, l'agente rimane fermo, e in questo caso viene incrementato il contato stuckTicks, variabile utilizzata per i colli di bottiglia dove gli agenti accumulano più ritardo.
+Una volta processati tutti gli agenti, il Manager impacchetta i risultati nel data_tick, contente le posizioni aggiornate e lo stato della congestione, permettendo al Client di aggiornare la visualizzazione grafica in tempo reale.
+
 ### *Sequence Diagram*
 
 ```mermaid
