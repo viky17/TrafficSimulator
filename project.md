@@ -154,10 +154,13 @@ stateDiagram-v2
     FINISHED --> [*]
 ```
 
-Il diagramma di stato definisce le regole di utilizzo del simulatore. La progressione non è libera ma vincolata dal completamento di operazioni atomiche che garantiscono la stabilità del sistema.
+The State Diagram defines the usage rules of the simulator. Progression is not free but constrained by the completion of atomic operations that guarantee the stability of the system.
 
-La transizione CREATED --> WORLD_READY è una transizione senza punto di ritorno, una volta confermato lo stato di WORLD_READY la topologia della mappa viene sigillata. Questo garantisce che il calcolo dei percorsi avvenga su un modello statico, inoltre se permettissimo di cambiare la mappa mentre gli agenti calcolano i percorsi rischierremmo errori di segmentazione o problemi di agenti "fantasm".
+The CREATED → WORLD_READY transition is a point of no return; once the WORLD_READY state is confirmed, the map topology is sealed. This ensures that path calculations occur on a static model; furthermore, if we allowed the map to change while agents are calculating paths, we would risk segmentation errors or "ghost" agent issues.
 
-Lo stato POPULATED si comporta da checkpoint prima dell'esecuzione. Separa la fase di allocazione della memoria (creazione degli agenti) dalla fase di elaborazione dei calcoli (movimento). Questo permette di verificare la qualità del popolamento tramite la variabile spawn_errors. Se troppi agenti sono falliti a causa di barriere troppo restrittive il sistema permette di resettare la simulazione senza averi mai avviato il loop di RUNNING, risparmiando risorse computazionali.
+The POPULATED state acts as a checkpoint before execution. It separates the memory allocation phase (agent creation) from the calculation processing phase (movement). This allows for verifying the quality of the population through the spawn_errors variable. If too many agents have failed due to overly restrictive barriers, the system allows for resetting the simulation without ever having started the RUNNING loop, saving computational resources.
 
-Il loop di simulazione è l'unico momento in cui il sistema è aperto al cambiamento dinamico, ma segue comunque una gerarchia rigida:
+The Simulation Loop defines the temporal coherence of the simulation. The Manager guarantees that each temporal "step" is atomic. Until the entire sequence [ Scan → Validation → Movement ] is completed for all actors, the tick does not advance. This prevents chronological misalignments between agents.
+The Manager remains in RUNNING even if all agents are blocked (total gridlock). The transition toward the final state is not triggered by a timer, but exclusively by the change in the active property of each instance. As long as potential movement exists, the system maintains active control.
+
+In the final transition to the FINISHED state, the Manager freezes the telemetry variables, such as stuckTicks or current_congestion, so that the Client reads definitive static data, preventing new calculations from tainting the final report statistics.
