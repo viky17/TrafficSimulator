@@ -53,10 +53,6 @@ Agents are the different entities managed by the Manager. Each agent follows a p
 
 The Utils class is packed with the math and logic the Manager needs. ComputePathWorker fetches map data and figures out the shortest routes using Dijkstra’s algorithm, and if a road is blocked, the Manager flags it. isGreenLight handles how traffic lights switch depending on the simulation tick. ValidateMovement steps in to stop an agent if its next road is packed already. GetEdgeOccupancy checks how many vehicles are on each piece of road, bumping up the count for heavy vehicles so it’s easy to spot upcoming traffic jams. ApplyBarriers takes out entire road connections, which you’d do for things like construction closures. PreProcessing nudges traffic toward busy spots in the morning and out to the edges later, using timeOfDay to set this morning/evening shift in behavior.
 
-*Simulation loop*: all'inizio di ogni Tick, il Manager scatta una "fotografia" dello stato globale delle strade tramite GetEdgeOccupancy. Questo passaggio serve a calcolare quanti veicoli occupano ogni segmento di strada in quel preciso istante. 
-Per ogni agente ancora attivo il Manager interroga la funzione ValidateMovement, qui il sistema verifica se il semaforo è verde e se la strada di destinazione ha ancora capacità fisica per ospitare l'agente considerato. Se la funzione da esito positivo, l'agente esegue un passo nella simulazione tramite il metodo step(). Se il movimento viene negato, l'agente rimane fermo, e in questo caso viene incrementato il contato stuckTicks, variabile utilizzata per i colli di bottiglia dove gli agenti accumulano più ritardo.
-Una volta processati tutti gli agenti, il Manager impacchetta i risultati nel data_tick, contente le posizioni aggiornate e lo stato della congestione, permettendo al Client di aggiornare la visualizzazione grafica in tempo reale.
-
 ### *Sequence Diagram*
 
 ```mermaid
@@ -95,14 +91,15 @@ sequenceDiagram
     end
     Manager-->>Client: return data_tick
 ```
-*Fase di initalizzazione*: tutto parte dal comando buildWorld inviato dal client. Il manager non esegui i calcoli geografici direttamente, ma delega alcune responsabilità alla classe Utils. Successivamente viene chiamata la funzione ApplyBarriers per tagliare i collegamenti del grafo dove l'utente ha inserito ostacoli, e successivamente viene chiamata la funzione PreProcessing per impostare i pesi stradali in base alla fascia oraria scelta (mattina/sera). Solo quando i grafi sono pronti, il Manager conferma al Client che il motore si trova in stato di "WORLD_READY"
+*Initialization Phase*: Everything starts with the buildWorld command sent by the client. The manager does not execute geographic calculations directly but delegates some responsibilities to the Utils class. Subsequently, the ApplyBarriers function is called to cut the graph connections where the user has inserted obstacles, and then the PreProcessing function is called to set the road weights based on the chosen time slot (morning/evening). Only when the graphs are ready does the Manager confirm to the Client that the engine is in the "WORLD_READY" state.
 
-*Fase di popolamento*: questa è la fase più onerosa per la CPU. Il Manager delega ancora una volta questo lavoro alla classe Utils, più precisamente alla funzione ComputePathWorker. Qui viene sfruttato l'algoritmo di Dijkstra per calcolare i cammini minimi su migliaia di nodi contemporaneamente. 
-Non tutti i percorsi sono garantiti, se le barriere inserite dal Client hanno isolato una zona, un agente potrebbe non riuscire ad indivduare un percorso valido e di conseguenza non verrebbe creato, il sistema lo rileva e incrementa il contatore spawn_errors, evitando il crash della simulazione. 
-Solo dopo aver ottenuto tutti i percorsi validi, il Manager istanzia gli ogetti Agent, assegniano a ciascuno un percorso. Quando ogni attore è pronto, il Manager aggiorna il suo stato in "POPULATED", segnalando al Client che la simulazione è pronta per essere eseguita.
+*Population Phase:* This is the most CPU-intensive phase. The Manager once again delegates this work to the Utils class, more specifically to the ComputePathWorker function. Here, Dijkstra's algorithm is exploited to calculate the shortest paths across thousands of nodes simultaneously.
+Not all paths are guaranteed; if the barriers inserted by the Client have isolated an area, an agent might not be able to identify a valid path and consequently would not be created. The system detects this and increments the spawn_errors counter, avoiding a simulation crash.
+Only after obtaining all valid paths does the Manager instantiate the Agent objects, assigning a path to each. When every actor is ready, the Manager updates its status to "POPULATED", signaling to the Client that the simulation is ready to be executed.
 
-
-
+*Simulation Loop:* At the beginning of each Tick, the Manager takes a "snapshot" of the global state of the roads via GetEdgeOccupancy. This step serves to calculate how many vehicles occupy each road segment at that precise moment.
+For each agent still active, the Manager queries the ValidateMovement function; here, the system verifies if the traffic light is green and if the destination road still has physical capacity to host the agent in question. If the function gives a positive result, the agent executes a step in the simulation via the step() method. If the movement is denied, the agent remains stationary, and in this case, the stuckTicks counter is incremented—a variable used for bottlenecks where agents accumulate the most delay.
+Once all agents have been processed, the Manager packs the results into the data_tick, containing the updated positions and the congestion status, allowing the Client to update the graphical visualization in real time.
 ### *State Diagram*
 
 ```mermaid
