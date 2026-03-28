@@ -91,6 +91,13 @@ sequenceDiagram
     end
     Manager-->>Client: return data_tick
 ```
+*Fase di initalizzazione*: tutto parte dal comando buildWorld inviato dal client. Il manager non esegui i calcoli geografici direttamente, ma delega alcune responsabilità alla classe Utils. Successivamente viene chiamata la funzione ApplyBarriers per tagliare i collegamenti del grafo dove l'utente ha inserito ostacoli, e successivamente viene chiamata la funzione PreProcessing per impostare i pesi stradali in base alla fascia oraria scelta (mattina/sera). Solo quando i grafi sono pronti, il Manager conferma al Client che il motore si trova in stato di "WORLD_READY"
+
+*Fase di popolamento*: questa è la fase più onerosa per la CPU. Il Manager delega ancora una volta questo lavoro alla classe Utils, più precisamente alla funzione ComputePathWorker. Qui viene sfruttato l'algoritmo di Dijkstra per calcolare i cammini minimi su migliaia di nodi contemporaneamente. 
+Non tutti i percorsi sono garantiti, se le barriere inserite dal Client hanno isolato una zona, un agente potrebbe non riuscire ad indivduare un percorso valido e di conseguenza non verrebbe creato, il sistema lo rileva e incrementa il contatore spawn_errors, evitando il crash della simulazione. 
+Solo dopo aver ottenuto tutti i percorsi validi, il Manager istanzia gli ogetti Agent, assegniano a ciascuno un percorso. Quando ogni attore è pronto, il Manager aggiorna il suo stato in "POPULATED", segnalando al Client che la simulazione è pronta per essere eseguita.
+
+
 
 ### *State Diagram*
 
