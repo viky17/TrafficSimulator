@@ -10,7 +10,7 @@ classDiagram
         +distRange: integer
         +status: String
         +agents: List
-        +raodsGeometry: List
+        +roadsGeometry: List
         +spawn_errors: integer
         +tick_attuale: integer
         +current_congestion: integer
@@ -47,11 +47,11 @@ classDiagram
     Manager ..> Utils : uses for calculations
     Agent ..> Utils : validated by
 ```
-The Manager class runs the whole simulation, handling everything from building the world to keeping track of each tick. It grabs two road graphs from OSMnx (the OpenStreetMap library): gDrive for cars and gWalk for pedestrians. To keep things light for the Client, it pulls just the coordinates from these graphs—this way, the Client can render maps fast without having to load the full graph. 
+The Manager class runs the whole simulation, handling everything from building the world to keeping track of each tick. It grabs two road graphs from OSMnx (the OpenStreetMap library): `gDrive` for cars and `gWalk` for pedestrians. To keep things light for the Client, it pulls just the coordinates from these graphs—this way, the Client can render maps fast without having to load the full graph. 
 
-Agents are the different entities managed by the Manager. Each agent follows a path found by Dijkstra’s algorithm, but they also need the actual coordinates (pathCoords) of that route to move around the world. The isHeavy attribute marks whether an agent, like a truck, puts more strain on traffic. This detail matters when you want to figure out how congested a given road is during GetEdgeOccupancy, since heavy agents add more load. The stuckTicks counter goes up whenever the Manager can’t let an agent move, tracking how long it spends blocked. 
+Agents are the different entities managed by the Manager. Each agent follows a path found by Dijkstra’s algorithm, but they also need the actual coordinates (`pathCoords`) of that route to move around the world. The `isHeavy` attribute marks whether an agent, like a truck, puts more strain on traffic. This detail matters when you want to figure out how congested a given road is during `GetEdgeOccupancy`, since heavy agents add more load. The `stuckTicks` counter goes up whenever the Manager can’t let an agent move, tracking how long it spends blocked. 
 
-The Utils class is packed with the math and logic the Manager needs. ComputePathWorker fetches map data and figures out the shortest routes using Dijkstra’s algorithm, and if a road is blocked, the Manager flags it. isGreenLight handles how traffic lights switch depending on the simulation tick. ValidateMovement steps in to stop an agent if its next road is packed already. GetEdgeOccupancy checks how many vehicles are on each piece of road, bumping up the count for heavy vehicles so it’s easy to spot upcoming traffic jams. ApplyBarriers takes out entire road connections, which you’d do for things like construction closures. PreProcessing nudges traffic toward busy spots in the morning and out to the edges later, using timeOfDay to set this morning/evening shift in behavior.
+The Utils class is packed with the math and logic the Manager needs. `ComputePathWorker` fetches map data and figures out the shortest routes using Dijkstra’s algorithm, and if a road is blocked, the Manager flags it. `isGreenLight` handles how traffic lights switch depending on the simulation tick. `ValidateMovement` steps in to stop an agent if its next road is packed already. `GetEdgeOccupancy` checks how many vehicles are on each piece of road, bumping up the count for heavy vehicles so it’s easy to spot upcoming traffic jams.`ApplyBarriers` takes out entire road connections, which you’d do for things like construction closures. `PreProcessing` nudges traffic toward busy spots in the morning and out to the edges later, using `timeOfDay` to set this morning/evening shift in behavior.
 
 ### *Sequence Diagram*
 
