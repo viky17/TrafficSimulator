@@ -1,166 +1,136 @@
-### *UML Class Diagram*
 
-```mermaid
-classDiagram
-    direction TB
+Nella fase iniziale del progetto, ogni entità era un'istanza di una classe Agent. Questo approccio, pur essendo corretto, introduceva un overhead insostenibile dovuto alla gestione dinamica degli oggetti in Python e alla frammentazione della memoria. Superati i 75.000 agenti, il sistema diventava Memory-Bound e CPU-Bound a causa dei cicli for necessari per aggiornare ogni stato.
 
-    class Manager{
-        +id: String
-        +coords: List
-        +distRange: integer
-        +status: String
-        +agents: List
-        +roadsGeometry: List
-        +spawn_errors: integer
-        +tick_attuale: integer
-        +current_congestion: integer
-        -gDrive: Graph
-        -gWalk: Graph
-        +buildWorld(barriers)
-        +populationWorld(vehicles, pedestrian, timeOfDay)
-        +step() List
-    }
-    class Agent{
-        +id: String
-        +type: String
-        +active: Boolean
-        +stuckTicks: integer
-        +ticksAlive: integer
-        +isHeavy: Boolean
-        -path: List
-        -pathCoords: List
-        -currentNode: Node
-        -currentStep: integer
-        +step()
-    }
-    class Utils{
-        <<Utility>>
-        +ComputePathWorker(args: Tuple) Dictionary
-        +IsGreenLight(u: integer, v: integer, tick: integer) Boolean
-        +GetEdgeOccupancy(allAgents: List) Dictionary
-        +ValidateMovement(agent, graph, occupancy, tick) Boolean
-        +ApplyBarriers(graph, barriers: integer)
-        +PreProcessing(graph, timeOfDay: String) Tuple
-    }
+La soluzione è stata la Vettorializzazione. Ho rimosso la classe Agent e trasformato l'intera popolazione in un set di tensori e matrici NumPy. Ogni agente è identificato esclusivamente da un indice all'interno di blocchi di memoria contigui. Questo permette di sfruttare le librerie scritte in C (come NumPy) per eseguire operazioni matematiche simultanee su tutta la popolazione, massimizzando l'efficienza dei registri della CPU e minimizzando i cache miss.
 
-    Manager "1" *-- "*" Agent : manages
-    Manager ..> Utils : uses for calculations
-    Agent ..> Utils : validated by
-```
-The Manager class runs the whole simulation, handling everything from building the world to keeping track of each tick. It grabs two road graphs from OSMnx (the OpenStreetMap library): `gDrive` for cars and `gWalk` for pedestrians. To keep things light for the Client, it pulls just the coordinates from these graphs—this way, the Client can render maps fast without having to load the full graph. 
+Per garantire la massima velocità di accesso, i dati sono organizzati in tre strutture principali pre-allocate:
+- *path_matrix*: è il database spaziale del sistema. Contiene le coordinate *(lat,lon)* per ogni agente *(N)* e per ogni step del percorso *(S)*. Utilizzando il tipo *float32* invece di *float64* standard, sono riuscito a dimezzare l'occupazione della RAM senza perdere la precisione necessaria.
 
-Agents are the different entities managed by the Manager. Each agent follows a path found by Dijkstra’s algorithm, but they also need the actual coordinates (`pathCoords`) of that route to move around the world. The `isHeavy` attribute marks whether an agent, like a truck, puts more strain on traffic. This detail matters when you want to figure out how congested a given road is during `GetEdgeOccupancy`, since heavy agents add more load. The `stuckTicks` counter goes up whenever the Manager can’t let an agent move, tracking how long it spends blocked. 
+- *pos_matrix*: rappresenta lo stato del sistema. Ad ogni tick, il sistema non calcola la posizione, ma estra dalla matrice *path_matrix* usando un operazione di Advanced Indexing. Matematicamente lo spostamento di 250.000 agenti avviene in un'unica operazione vettoriale:
+        *pos_matrix = path_matrix[np.arange(N),current_step_idx]*
+    
+- *active_mask*: una maschera booleana che permette alla CPU di operare solo sugli agenti ancora in movimento escludendo istantaneamente dal calcolo chi ha già raggiunto la destinazione.
 
-The Utils class is packed with the math and logic the Manager needs. `ComputePathWorker` fetches map data and figures out the shortest routes using Dijkstra’s algorithm, and if a road is blocked, the Manager flags it. `isGreenLight` handles how traffic lights switch depending on the simulation tick. `ValidateMovement` steps in to stop an agent if its next road is packed already. `GetEdgeOccupancy` checks how many vehicles are on each piece of road, bumping up the count for heavy vehicles so it’s easy to spot upcoming traffic jams.`ApplyBarriers` takes out entire road connections, which you’d do for things like construction closures. `PreProcessing` nudges traffic toward busy spots in the morning and out to the edges later, using `timeOfDay` to set this morning/evening shift in behavior.
+**Preparazione del Grafo e Barriere stradali**
+Prima della simulazione, il Manager integra i dati di OpenStreetMap tramite OSMnx. Le barriere sono modifiche topologiche al grafo stradale. Se una strada viene bloccata, l'arco corrispondente viene rimosso dal grafo di NetworkX. Questo garantisce che l'algoritmo di Dijkstra non "veda" nemmeno la strada chiusa, forzando la generazione di percorsi alternativi reali.
+Ogni arco del grafo possiede un attributo di capacità fisica. Durante il preprocessing, calcoliamo il peso delle strade non solo in base alla lunghezza, ma anche in base al tipo di traffico (veicolare vs pedonale) e all'ora del giorno, simulando la naturale propensione dei flussi verso le arterie principali.
 
-### *Sequence Diagram*
+**Popolazione tramite Multiprocessing**
+Il calcolo del percorso più breve, il quale utilizza l'algoritmo di Dijkstra, per centinaia di migliaia di coppie origine-destinazione è l'operazione più onerosa. Per superare il Global Interpreter Lock (GIL) di Python, il simulatore utilizza un sistema di Parallel Population.
+Il carico viene distribuito su processi worker indipendenti che operano in parallelo. Ogni core della CPU riceve un sottoinsieme di task, calcola i percorsi e restituisce i dati grezzi che vengono poi impacchettati nelle matrici finali. Questo approccio garantisce una scalabilità quasi lineare rispetto al numero di core fisici disponibili.
 
-```mermaid
+**Gestione degli errori**
+Quando un utente inserisce delle barriere stradali (es. chiude un intero quartiere), il grafo di NetworkX viene fisicamente modificato. Questo crea un rischio concreto: un agente potrebbe ricevere un punto di partenza (Origine) o di arrivo (Destinazione) che non è più collegato al resto della città.
+In un approccio standard, l'algoritmo di Dijkstra solleverebbe un'eccezione NodeNotFound o NetworkXNoPath. Se non gestita, questa fermerebbe l'intera popolazione.
+
+Durante la fase di Parallel Population, ogni worker opera all'interno di un blocco try-except. Se un percorso non può essere calcolato, il worker non interrompe il processo, ma restituisce un valore nullo.
+Il Manager raccoglie solo i risultati validi. Gli agenti "falliti" vengono conteggiati nella variabile spawn_errors, ma non vengono mai inseriti nelle matrici NumPy finali.
+Questo garantisce che, una volta avviata la simulazione, ogni riga della path_matrix contenga dati certi e navigabili, eliminando alla radice il rischio di crash durante il loop di movimento.
+
+**Diagramma di sequenza**
+La scelta di utilizzare FastAPI risponde a una precisa necessità architettonica: separare la gestione delle risorse (il calcolo delle rotte e del movimento) dalla logica di visualizzazione o di comando (il Frontend o il Client).
+In un sistema che gestisce centinaia di migliaia di agenti, il thread di calcolo non deve mai essere bloccato da operazioni di I/O. L'architettura API permette al Manager di:
+
+- Operare in Background: Mentre il motore processa i tick della simulazione, le API restano in ascolto, permettendo all'utente di interrogare lo stato del sistema (es. quanti agenti sono ancora attivi) senza interrompere il calcolo.
+
+- Controllare il Ciclo di Vita: Ogni fase della simulazione è isolata. Questo significa che il Client ha il controllo totale su "quando" costruire il mondo, "quando" popolarlo e "quando" far avanzare il tempo, garantendo una sincronizzazione perfetta tra la logica e la memoria fisica del server.
+
+Uno dei vantaggi principali di questo approccio è l'efficienza nel trasferimento dei dati. Invece di inviare strutture dati complesse e pesanti (come l'intero grafo o tutti i percorsi pre-calcolati), l'API agisce da filtro in modo che ad ogni chiamata di step(), il sistema estrae solo una "fotografia" istantanea della pos_matrix.
+I dati vengono serializzati in JSON leggero, contenente solo le coordinate e gli ID necessari alla visualizzazione. Questo approccio minimizza la latenza di rete, rendendo possibile una visualizzazione fluida anche quando il motore sta processando popolazioni molto grandi.
+
+*Rotte*:
+- POST /build (Inizializzazione): Riceve le coordinate geografiche e le barriere. Il Manager modella il grafo stradale. Finché questa fase non è conclusa, il grafo è considerato "instabile" e il sistema impedisce l'accesso alle fasi successive.
+
+- POST /populate (Popolazione): Avvia il calcolo massivo dei percorsi. Grazie all'uso dei BackgroundTasks, la rotta restituisce subito il controllo al Client, evitando timeout e permettendo una gestione fluida della UI o dei sistemi di monitoraggio.
+
+- GET /step (Esecuzione): Ogni chiamata triggera un tick di simulazione. Il Manager esegue uno "slice" della pos_matrix e restituisce le coordinate correnti. Questo design permette di visualizzare i dati in tempo reale senza dover gestire l'intero database dei percorsi sul lato Client.
+
 sequenceDiagram
     autonumber
     participant Client
     participant Manager
     participant Utils
-    participant Agent
+    participant NumPy
 
-    Note over Client, Manager: Initialization Phase
+    Note over Client, Manager: Fase di Inizializzazione
     Client->>Manager: buildWorld(barriers)
     Manager->>Utils: ApplyBarriers(graph, barriers)
     Manager->>Utils: PreProcessing(graph)
     Manager-->>Client: status = "WORLD_READY"
 
-    Note over Client, Manager: Population Phase
+    Note over Client, Manager: Fase di Popolazione (Parallel)
     Client->>Manager: populationWorld(counts)
     Manager->>Utils: ComputePathWorker(tasks)
     Utils-->>Manager: return paths
-    Manager->>Agent: Create Instances
+    Manager->>NumPy: Allocate and Pack Matrices (path_matrix)
     Manager-->>Client: status = "POPULATED"
 
-    Note over Client, Manager: Simulation Loop
+    Note over Client, Manager: Loop di Simulazione (Vectorized)
     Client->>Manager: step()
-    Manager->>Utils: GetEdgeOccupancy(allAgents)
+    Manager->>Utils: GetEdgeOccupancy(path_matrix, active_mask)
     
-    loop For each active Agent
-        Manager->>Utils: ValidateMovement(agent, occupancy)
-        alt isValid is True
-            Manager->>Agent: step()
-            Agent->>Agent: update currentStep
-        else Movement Blocked
-            Manager->>Agent: increment stuckTicks
-        end
+    rect rgb(240, 240, 240)
+    Note right of Manager: Calcolo Vettoriale (No Loops)
+    Manager->>NumPy: Apply Advanced Indexing & Active Mask
+    NumPy-->>Manager: return pos_matrix
     end
-    Manager-->>Client: return data_tick
-```
-*Initialization Phase*: Everything starts with the buildWorld command sent by the client. The manager does not execute geographic calculations directly but delegates some responsibilities to the Utils class. Subsequently, the ApplyBarriers function is called to cut the graph connections where the user has inserted obstacles, and then the PreProcessing function is called to set the road weights based on the chosen time slot (morning/evening). Only when the graphs are ready does the Manager confirm to the Client that the engine is in the "WORLD_READY" state.
 
-*Population Phase:* This is the most CPU-intensive phase. The Manager once again delegates this work to the Utils class, more specifically to the ComputePathWorker function. Here, Dijkstra's algorithm is exploited to calculate the shortest paths across thousands of nodes simultaneously.
-Not all paths are guaranteed; if the barriers inserted by the Client have isolated an area, an agent might not be able to identify a valid path and consequently would not be created. The system detects this and increments the spawn_errors counter, avoiding a simulation crash.
-Only after obtaining all valid paths does the Manager instantiate the Agent objects, assigning a path to each. When every actor is ready, the Manager updates its status to "POPULATED", signaling to the Client that the simulation is ready to be executed.
+    Manager-->>Client: return data_tick (JSON positions)
 
-*Simulation Loop:* At the beginning of each Tick, the Manager takes a "snapshot" of the global state of the roads via GetEdgeOccupancy. This step serves to calculate how many vehicles occupy each road segment at that precise moment.
-For each agent still active, the Manager queries the ValidateMovement function; here, the system verifies if the traffic light is green and if the destination road still has physical capacity to host the agent in question. If the function gives a positive result, the agent executes a step in the simulation via the step() method. If the movement is denied, the agent remains stationary, and in this case, the stuckTicks counter is incremented—a variable used for bottlenecks where agents accumulate the most delay.
-Once all agents have been processed, the Manager packs the results into the data_tick, containing the updated positions and the congestion status, allowing the Client to update the graphical visualization in real time.
-### *State Diagram*
+**La macchina a stati**
+La stabilità del motore di simulazione è garantita da una macchina a stati finiti che impedisce operazioni illegali sulla memoria. Poiché il sistema lavora con matrici pre-allocate e calcoli paralleli, ogni stato funge da "checkpoint" di validazione: non è possibile avanzare se la fase precedente non ha garantito l'integrità dei dati.
 
-```mermaid
+*Stati*:
+- CREATED: Il Manager è istanziato ma la memoria è "vuota". In questa fase il sistema è in ascolto dei parametri di configurazione (coordinate, raggio, tipologia di rete). È l'unico momento in cui è possibile definire l'ambiente senza causare inconsistenze.
+
+- WORLD_READY: Questo stato viene raggiunto dopo il completamento della rotta /build. Il grafo stradale è stato scaricato, le barriere topologiche sono state applicate e i pesi delle strade (costi di percorrenza) sono stati calcolati. Il mondo è ora immutabile: sigillare la topologia in questo stato garantisce che i percorsi calcolati successivamente non facciano riferimento a strade rimosse o nodi inesistenti.
+
+- POPULATING: Stato transitorio attivato dalla rotta /populate. Il sistema è occupato nel calcolo parallelo dei percorsi (Dijkstra) in background. Durante questa fase, le rotte di esecuzione (step) sono bloccate per evitare accessi a matrici non ancora completamente allocate o riempite.
+
+- POPULATED: Il calcolo in background è terminato e i dati sono stati "impacchettati" nelle matrici NumPy. Il numero di agenti N è ora fisso e la memoria è ottimizzata. In questo stato, il sistema espone la variabile spawn_errors: se il tasso di fallimento è accettabile, il motore è pronto per la simulazione fisica.
+
+- RUNNING: Il motore è in fase di esecuzione. Ogni chiamata alla rotta /step fa avanzare il tick globale. Il sistema utilizza la active_mask per processare solo gli indici necessari, mantenendo un carico computazionale costante.
+
+- FINISHED: Lo stato viene raggiunto quando active_mask.any() restituisce False (tutti gli agenti sono arrivati o bloccati). Il Manager congela le telemetrie finali (es. congestione media, stuckTicks totali) per permettere al Client di scaricare un report statico definitivo senza il rischio di nuove mutazioni dei dati.
+
+
 stateDiagram-v2
     direction TB
 
-    [*] --> CREATED : Manager() Initialization
+    [*] --> CREATED : Initialization
     
     state CREATED {
         direction TB
-        State_1: Waiting for buildWorld()
-        State_2: Running ApplyBarriers()
-        State_3: Running PreProcessing()
-        
-        State_1 --> State_2
-        State_2 --> State_3
+        S1: Waiting for buildWorld()
+        S2: Applying Topo-Modifications
+        S1 --> S2
     }
 
     CREATED --> WORLD_READY : status = "WORLD_READY"
     
     state WORLD_READY {
         direction TB
-        State_4: Waiting for populationWorld()
-        State_5: Running ComputePathWorker()
-        State_6: Initializing Agent Instances
-        
-        State_4 --> State_5
-        State_5 --> State_6
+        S3: Waiting for populationWorld()
+        S4: Parallel Pathfinding (Dijkstra)
+        S5: Memory Packing (NumPy Allocation)
+        S3 --> S4
+        S4 --> S5
     }
 
     WORLD_READY --> POPULATED : status = "POPULATED"
 
     state RUNNING {
         direction TB
-        Step_Update: tick_attuale++
+        Step: tick_attuale++
+        Scan: Occupancy Vector Scan
+        Update: Vectorized Indexing Update
         
-        Traffic_Scan: GetEdgeOccupancy(allAgents)
-        
-        Validation: ValidateMovement(agent, occupancy)
-        
-        Movement: Agent.step() OR stuckTicks++
-        
-        Step_Update --> Traffic_Scan
-        Traffic_Scan --> Validation
-        Validation --> Movement
-        Movement --> Step_Update : Next Tick Loop
+        Step --> Scan
+        Scan --> Update
+        Update --> Step : Loop
     }
 
-    POPULATED --> RUNNING : status = "RUNNING" (first step call)
+    POPULATED --> RUNNING : status = "RUNNING"
     
-    RUNNING --> FINISHED : All Agents active = False
+    RUNNING --> FINISHED : active_mask.any() == False
     FINISHED --> [*]
-```
-
-The State Diagram defines the usage rules of the simulator. Progression is not free but constrained by the completion of atomic operations that guarantee the stability of the system.
-
-The CREATED → WORLD_READY transition is a point of no return; once the WORLD_READY state is confirmed, the map topology is sealed. This ensures that path calculations occur on a static model; furthermore, if we allowed the map to change while agents are calculating paths, we would risk segmentation errors or "ghost" agent issues.
-
-The POPULATED state acts as a checkpoint before execution. It separates the memory allocation phase (agent creation) from the calculation processing phase (movement). This allows for verifying the quality of the population through the spawn_errors variable. If too many agents have failed due to overly restrictive barriers, the system allows for resetting the simulation without ever having started the RUNNING loop, saving computational resources.
-
-The Simulation Loop defines the temporal coherence of the simulation. The Manager guarantees that each temporal "step" is atomic. Until the entire sequence [ Scan → Validation → Movement ] is completed for all actors, the tick does not advance. This prevents chronological misalignments between agents.
-The Manager remains in RUNNING even if all agents are blocked (total gridlock). The transition toward the final state is not triggered by a timer, but exclusively by the change in the active property of each instance. As long as potential movement exists, the system maintains active control.
-
-In the final transition to the FINISHED state, the Manager freezes the telemetry variables, such as stuckTicks or current_congestion, so that the Client reads definitive static data, preventing new calculations from tainting the final report statistics.
