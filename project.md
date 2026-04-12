@@ -76,7 +76,8 @@ sequenceDiagram
     NumPy-->>Manager: return pos_matrix
     end
 
-    Manager-->>Client: return data_tick (JSON positions)```
+    Manager-->>Client: return data_tick (JSON positions)
+```
 
 **La macchina a stati**
 La stabilità del motore di simulazione è garantita da una macchina a stati finiti che impedisce operazioni illegali sulla memoria. Poiché il sistema lavora con matrici pre-allocate e calcoli paralleli, ogni stato funge da "checkpoint" di validazione: non è possibile avanzare se la fase precedente non ha garantito l'integrità dei dati.
@@ -134,4 +135,5 @@ stateDiagram-v2
     POPULATED --> RUNNING : status = "RUNNING"
     
     RUNNING --> FINISHED : active_mask.any() == False
-    FINISHED --> [*]```
+    FINISHED --> [*]
+```
