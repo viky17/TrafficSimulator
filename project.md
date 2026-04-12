@@ -1,3 +1,4 @@
+### Architettura del motore di simulazione
 
 Nella fase iniziale del progetto, ogni entità era un'istanza di una classe Agent. Questo approccio, pur essendo corretto, introduceva un overhead insostenibile dovuto alla gestione dinamica degli oggetti in Python e alla frammentazione della memoria. Superati i 75.000 agenti, il sistema diventava Memory-Bound e CPU-Bound a causa dei cicli for necessari per aggiornare ogni stato.
 
@@ -71,7 +72,7 @@ sequenceDiagram
     Manager->>Utils: GetEdgeOccupancy(path_matrix, active_mask)
     
     rect rgb(240, 240, 240)
-    Note right of Manager: Calcolo Vettoriale (No Loops)
+    Note right of Manager: Calcolo Vettoriale
     Manager->>NumPy: Apply Advanced Indexing & Active Mask
     NumPy-->>Manager: return pos_matrix
     end
