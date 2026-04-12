@@ -45,6 +45,7 @@ I dati vengono serializzati in JSON leggero, contenente solo le coordinate e gli
 
 - GET /step (Esecuzione): Ogni chiamata triggera un tick di simulazione. Il Manager esegue uno "slice" della pos_matrix e restituisce le coordinate correnti. Questo design permette di visualizzare i dati in tempo reale senza dover gestire l'intero database dei percorsi sul lato Client.
 
+```mermaid
 sequenceDiagram
     autonumber
     participant Client
@@ -75,7 +76,7 @@ sequenceDiagram
     NumPy-->>Manager: return pos_matrix
     end
 
-    Manager-->>Client: return data_tick (JSON positions)
+    Manager-->>Client: return data_tick (JSON positions)```
 
 **La macchina a stati**
 La stabilità del motore di simulazione è garantita da una macchina a stati finiti che impedisce operazioni illegali sulla memoria. Poiché il sistema lavora con matrici pre-allocate e calcoli paralleli, ogni stato funge da "checkpoint" di validazione: non è possibile avanzare se la fase precedente non ha garantito l'integrità dei dati.
@@ -93,7 +94,7 @@ La stabilità del motore di simulazione è garantita da una macchina a stati fin
 
 - FINISHED: Lo stato viene raggiunto quando active_mask.any() restituisce False (tutti gli agenti sono arrivati o bloccati). Il Manager congela le telemetrie finali (es. congestione media, stuckTicks totali) per permettere al Client di scaricare un report statico definitivo senza il rischio di nuove mutazioni dei dati.
 
-
+```mermaid
 stateDiagram-v2
     direction TB
 
@@ -133,4 +134,4 @@ stateDiagram-v2
     POPULATED --> RUNNING : status = "RUNNING"
     
     RUNNING --> FINISHED : active_mask.any() == False
-    FINISHED --> [*]
+    FINISHED --> [*]```
