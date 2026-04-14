@@ -1,6 +1,6 @@
 Il passaggio dall'architettura a oggetti (OOP) a quella orientata ai dati (DOD) è stato dettato da una necessità fisica riscontrata durante la fase dei test sulle performance.
 
-# Risultati del test sull'archiettura OOP
+## Risultati del test sull'archiettura OOP
 
 | Agenti | Ticks | Tempo Totale (s) | Throughput (Rows/s) | Peak RAM (MB) |
 |--------|-------|------------------|----------------------|----------------|
