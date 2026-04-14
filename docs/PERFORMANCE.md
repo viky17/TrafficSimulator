@@ -104,3 +104,10 @@ Per gestire 2.500.000 agenti, il sistema ha tentato di allocare simultaneamente:
 Sebbene la workstation sia dotata di 32 GB, il sistema operativo non è stato in grado di trovare un blocco di indirizzi unico e contiguo abbastanza grande da ospitare queste matrici, a causa della naturale frammentazione della RAM occupata dai processi in background. Il *Memory Error* è quindi l'intervento di sicurezza del sistema per prevenire un blocco totale dell'hardware (kernel panic).
 
 Il fatto che la latenza per tick rimanga costante (proporzionalmente) fino al limite della RAM suggerisce che l'architettura sta sfruttando la gerarchia della memoria. Organizzando i dati in modo sequenziale, abbiamo minimizzato i cache miss, infatti la CPU trova quasi sempre i dati di cui ha bisogno nei registri veloci (L1/L2), senza dover attendere i tempi di risposta, molto più lenti, della RAM principale.
+
+## Conclusioni
+Il passaggio alla nuova architettura Data-Oriented ha permesso di:
+
+  - Aumentare il limite di simulazione (da 75.000 a 2.000.000), su una workstation da 32GB di RAM
+  - Garantire un'esecuzione deterministica, infatti il tempo richiesto per un tick è lineare rispetto alla mole di dati
+  - Sfruttare le istruzioni Single Instruction Multiple Data del processore, calcolando molte posizioni in un singolo ciclo di clock.
