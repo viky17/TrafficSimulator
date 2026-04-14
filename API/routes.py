@@ -48,15 +48,3 @@ async def get_status():
         "tick": sim.tick_attuale,
         "agents": count
     }
-
-@router.post("/instant-populate")
-async def instant_populate(vehicle_count: int):
-    # Usiamo 'sim', che è l'istanza di Manager definita sopra nel file
-    try:
-        # Verifichiamo se il metodo fast_populate esiste nell'oggetto sim
-        count = sim.fast_populate(vehicle_count)
-        return {"status": "POPULATED", "agents": count, "mode": "instant"}
-    except Exception as e:
-        # Stampiamo l'errore esatto sulla console di Uvicorn per debug
-        print(f"DEBUG ERROR: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e)) # Parentesi chiusa correttamente
