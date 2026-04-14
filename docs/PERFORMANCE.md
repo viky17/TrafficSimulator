@@ -10,8 +10,9 @@ Il passaggio dall'architettura a oggetti (OOP) a quella orientata ai dati (DOD) 
 | 15.000 | 200   | 904.92s          | 678.0                | 296.55         |
 | 25.000 | 300   | 1512.07s         | 657.0                | 372.40         |
 
-**| Agents | Radius | Ticks | Elapsed_s | Rows_Generated | Throughput (Rows/s) |**
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+
+| Agents | Radius | Ticks | Elapsed_s | Rows_Generated | Throughput (Rows/s) |
+| :---: | :---: | :---: | :---: | :---: | :---: |
 | 30,000 | 1500m | 100 | 258.81s | 1,445,833 | 5,586 |
 | 50,000 | 2000m | 100 | 539.71s | 2,796,979 | 5,182 |
 | 75,000 | 3000m | 150 | 1317.36s | 5,663,755 | 4,299 |
