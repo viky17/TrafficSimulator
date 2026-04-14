@@ -77,3 +77,16 @@ Grazie a questa archiettura, il throughput di popolazione rimane stabile anche a
 | 50.000  | 1504.39               | 149.925                            | 0.333s                   |
 | 100.000 | 3255.46               | 150.000                            | 0.666s                   |
 
+### Breaking Point
+Per confermare la scalabilità dell'architettura DOD, ho condotto uno stress test finalizzato a individuare il *Breaking Point* fisico del sistema su una workstation dotata di **32 GB di RAM**.
+Al fine di isolare le performance del motore di calcolo dai tempi di I/O dovuti al pre-processing tramite l'algoritmo di Dijkstra, ho implementato una tecnica alternativa di popolazione istantanea, in cui vengono allocate istantaneamente le strutture dati vettorializzate in memoria, permettendo di testare il comportamento del sistema con un numero molto grande di entità attive.
+
+**Risultati del test**:
+| Agenti Totali | Latenza per Tick | Throughput (Rows/s) | Occupazione RAM | Esito           |
+|----------------|------------------|----------------------|------------------|------------------|
+| 100.000        | 0.38s            | 263.157              | 34.4%            | ✅ OK            |
+| 500.000        | 1.81s            | 276.243              | 44.2%            | ✅ OK            |
+| 1.000.000      | 3.62s            | 276.243              | 55.8%            | ✅ OK            |
+| 1.500.000      | 5.61s            | 267.379              | 67.4%            | ✅ OK            |
+| 2.000.000      | 7.51s            | 266.311              | 77.6%            | ✅ OK            |
+| 2.500.000      | --               | --                   | --               | ❌ MEMORY ERROR  |
