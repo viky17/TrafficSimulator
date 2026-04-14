@@ -19,9 +19,9 @@ Il passaggio dall'architettura a oggetti (OOP) a quella orientata ai dati (DOD) 
 | 100,000 | 5000m | 200 | **SYSTEM CRASH** | -- | -- |
 
 Il problema principale dell'approccio OOP in Python è la frammentazione della memoria. Ogni istanza di *Agent* è un oggetto allocato in una posizione arbitraria.
-Quando la CPU processa una lista di oggetti, deve continuare a recuperare puntatori a indirizzi di memoria distanti. Questo impedisce al processore di utilizzare efficacemente la cache, forzando continui accessi alla RAM. Inoltre il modello OOP richiede alla CPU di saltare da un oggetto all'altro in memoria, riducendo drasticamente il throughpu (limitato ~650 righe/s).
+Quando la CPU processa una lista di oggetti, deve continuare a recuperare puntatori a indirizzi di memoria distanti. Questo impedisce al processore di utilizzare efficacemente la cache, forzando continui accessi alla RAM. Inoltre il modello OOP richiede alla CPU di saltare da un oggetto all'altro in memoria, riducendo drasticamente il throughput (limitato ~650 righe/s).
 
-Inoltre inizialmente il ciclo di vita era gestito da un ciclo del tipo *for agent in agents: agent.step*. Il problema è che per ogni iterazione l'interprete deve cercare il metodo step nel dizionario dell'istanza e della classe.
+Inoltre inizialmente il ciclo di vita era gestito da un ciclo del tipo *for agent in agents: agent.step()*. Il problema è che per ogni iterazione l'interprete deve cercare il metodo step nel dizionario dell'istanza e della classe.
 Essendo Python un linguaggio dinamico, controlla costantemente se l'oggetto è ancora quello giusto e se può eseguire quel comando.
 
 Infine un oggetto Python porta con se oltre i suoi dati anche un'enorme quantità di metadati come dizionari interni, puntatori al Garbage Collector e informazioni sui tipi. Questo già nel test con 25.000 agenti ha portato a un occupazioni di memoria pari a 372 MB. Questo porta a un inevitabile crash per *Out of memory* sui 100.000 agenti.
