@@ -83,10 +83,23 @@ Al fine di isolare le performance del motore di calcolo dai tempi di I/O dovuti 
 
 **Risultati del test**:
 | Agenti Totali | Latenza per Tick | Throughput (Rows/s) | Occupazione RAM | Esito           |
-|----------------|------------------|----------------------|------------------|------------------|
-| 100.000        | 0.38s            | 263.157              | 34.4%            | ✅ OK            |
-| 500.000        | 1.81s            | 276.243              | 44.2%            | ✅ OK            |
-| 1.000.000      | 3.62s            | 276.243              | 55.8%            | ✅ OK            |
-| 1.500.000      | 5.61s            | 267.379              | 67.4%            | ✅ OK            |
-| 2.000.000      | 7.51s            | 266.311              | 77.6%            | ✅ OK            |
-| 2.500.000      | --               | --                   | --               | ❌ MEMORY ERROR  |
+|----------------|------------------|----------------------|------------------|--------------|
+| 100.000        | 0.38s            | 263.157              | 34.4%            | PASSED       |
+| 500.000        | 1.81s            | 276.243              | 44.2%            | PASSED       |
+| 1.000.000      | 3.62s            | 276.243              | 55.8%            | PASSED       |
+| 1.500.000      | 5.61s            | 267.379              | 67.4%            | PASSED       |
+| 2.000.000      | 7.51s            | 266.311              | 77.6%            | PASSED       |
+| 2.500.000      | --               | --                   | --               | MEMORY ERROR |
+
+L'analisi dei risultati mostra che nel nuovo motore di simulazione il limite non è più dato dalla velocità di esecuzione, come avveniva nel modello OOP, ma è dato esclusivamente dalla capacità fisica della memoria.
+Fino alla soglia dei **2.000.000 agenti**, il sistema mostra una scalabilità quasi lineare, mantenendo un throughput costante sopra le 260.000 righe processate al secondo. Questo indica che l'architettura è estremamente efficiente nel gestire le risorse e il tempo di calcolo cresce in modo prevedibile rispetto all'aumentare dei dati.
+
+Il fallimento riscontrato a 2.500.000 agenti è dovuto a un limite fisico di indirizzamento della RAM. In un'architettura DOD basata su NumPy, i dati devono essere memorizzati in blocchi di memoria contigui per permettere alla CPU di eseguire istruzioni SIMD.
+Per gestire 2.500.000 agenti, il sistema ha tentato di allocare simultaneamente:
+
+  - *node_path_matrix* (int64): ~9.31 GiB
+  - *path_matrix* (float32): ~9.31 GiB
+  - Strutture di stato e overhead: ~2.5 GiB
+Sebbene la workstation sia dotata di 32 GB, il sistema operativo non è stato in grado di trovare un blocco di indirizzi unico e contiguo abbastanza grande da ospitare queste matrici, a causa della naturale frammentazione della RAM occupata dai processi in background. Il *Memory Error* è quindi l'intervento di sicurezza del sistema per prevenire un blocco totale dell'hardware (kernel panic).
+
+Il fatto che la latenza per tick rimanga costante (proporzionalmente) fino al limite della RAM suggerisce che l'architettura sta sfruttando la gerarchia della memoria. Organizzando i dati in modo sequenziale, abbiamo minimizzato i cache miss, infatti la CPU trova quasi sempre i dati di cui ha bisogno nei registri veloci (L1/L2), senza dover attendere i tempi di risposta, molto più lenti, della RAM principale.
