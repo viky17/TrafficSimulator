@@ -37,6 +37,24 @@ I test sul nuovo motore vettorializzato hanno rilevato una nuova sfida, ovvero l
 Il motore puro, lavora esclusivamente su matrici in RAM, raggiungendo picchi di **150.000** agenti al secondo. In questo caso la CPU è saturata esclusivamente da calcoli matematici SIMD. Quando però il sistema deve comunicare con l'esterno (fase di I/O) deve convertire questi tensori in formati leggibili, come ad esempio il JSON, per le API. Questa operazione riduce il throughput a circa 60.000 agenti/s. A tale scopo l'API del metodo step permette di utilizzare un attributo per specificare se è necessario oppure no ritornare i dati al termine dell'iterazione. In questo modo il cliente scegle se necessita di ottenere l'evoluzione delle posizioni degli agenti ad ogni iterazione o se è sufficiente ricevere i dati solo al termine della simulazione.
 Di seguito il confronto dei due test:
 
+**Full I/O**:
+| Agenti | Ticks | Tempo Totale (s) | Throughput (Rows/s) | Peak RAM (MB) |
+|--------|-------|------------------|----------------------|----------------|
+| 100    | 100   | 0.37s            | 26.926               | 68.96          |
+| 1.000  | 100   | 1.79s            | 55.653               | 69.42          |
+| 5.000  | 200   | 16.36s           | 61.121               | 72.29          |
+| 15.000 | 200   | 49.23s           | 60.938               | 77.73          |
+| 25.000 | 300   | 119.69s          | 62.658               | 82.75          |
+
+**PURE ENGINE**:
+| Agenti | Ticks | Tempo Totale (s) | Throughput (Rows/s) | Peak RAM (MB) |
+|--------|-------|------------------|----------------------|----------------|
+| 100    | 100   | 0.25s            | 38.774               | 68.96          |
+| 1.000  | 100   | 0.77s            | 128.633              | 69.42          |
+| 5.000  | 200   | 6.67s            | 149.925              | 72.29          |
+| 15.000 | 200   | 20.27s           | 148.044              | 77.73          |
+| 25.000 | 300   | 50.09s           | 149.718              | 82.75          |
+
 ### Popolazione parallella
 Nonostante l'efficienza nel movimento, la fase di inizializzazione (il calcolo dei percorsi tramite l'algoritmo di Dijkstra) rimaneva l'operazione a più alto costo computazionale. In Python, il Global Interpreter Lock (GIL) impedisce ai thread di eseguire calcoli CPU-intensive in parallelo, rendendo la generazione di 100.000 percorsi un processo estremamente lento e sequenziale.
 
@@ -45,3 +63,16 @@ La popolazione totale viene suddivisa in "batch" distribuiti equamente tra i cor
 Una volta terminati i calcoli paralleli, i risultati grezzi vengono raccolti e impacchettati direttamente nelle matrici NumPy pre-allocate. 
 
 Grazie a questa archiettura, il throughput di popolazione rimane stabile anche al crescere del carico, mantenendo una media di **30-35 agenti/s**. Senza questo approccio, il tempo di attesa per popolare scenari metropolitani sarebbe stato proibitivo, portando spesso il sistema al crash dovuto al timeout delle API.
+
+**Test di popolazione senza parallelizzazione**:
+| Agenti  | Tempo Popolazione (s) | Throughput Simulazione (Agenti/s) | Latenza Simulazione (s) |
+|---------|------------------------|------------------------------------|--------------------------|
+| 50.000  | 2512.56*              | 68.196                             | 0.733s                   |
+| 100.000 | 5263.15*              | 96.124                             | 1.040s                   |
+
+**Test di popolazione con parallelizzazione**:
+| Agenti  | Tempo Popolazione (s) | Throughput Simulazione (Agenti/s) | Latenza Simulazione (s) |
+|---------|------------------------|------------------------------------|--------------------------|
+| 50.000  | 1504.39               | 149.925                            | 0.333s                   |
+| 100.000 | 3255.46               | 150.000                            | 0.666s                   |
+
