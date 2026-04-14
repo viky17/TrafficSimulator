@@ -199,31 +199,4 @@ class Manager:
             })
         return data_tick
     
-    def fast_populate(self, vehicle_count: int):
-        try:
-            steps = 500
-            # 1. Matrice coordinate (necessaria per pos_matrix)
-            self.path_matrix = np.full((vehicle_count, steps, 2), 0.00001, dtype=np.float32)
-            
-            # 2. FIX: Creiamo la matrice dei nodi (indispensabile per GetEdgeOccupancy)
-            # Usiamo l'ID di un nodo reale del tuo grafo per evitare KeyError
-            some_real_node = self.nodesD[0] if self.nodesD else 0
-            self.node_path_matrix = np.full((vehicle_count, steps), some_real_node, dtype=np.int64)
-            
-            # 3. Inizializzazione stati
-            self.current_step_idx = np.zeros(vehicle_count, dtype=np.int32)
-            self.agent_types_matrix = np.zeros(vehicle_count, dtype=np.int8) 
-            self.active_mask = np.ones(vehicle_count, dtype=bool)
-            
-            # 4. Sincronizzazione variabili mancanti
-            self.tick_attuale = 0
-            self.status = "POPULATED"
-            
-            # Inizializziamo pos_matrix come fa il tuo populationWorld reale
-            self.pos_matrix = self.path_matrix[:, 0, :]
-            
-            print(f"✅ Mock Compatibile Pronto: {vehicle_count} agenti")
-            return vehicle_count
-        except Exception as e:
-            print(f"❌ ERRORE CRITICO: {e}")
-            raise e
+   
